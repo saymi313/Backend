@@ -1,6 +1,5 @@
 const requiredEnvVars = [
   'NODE_ENV',
-  'PORT',
   'MONGODB_URI',
   'JWT_SECRET',
 ];
