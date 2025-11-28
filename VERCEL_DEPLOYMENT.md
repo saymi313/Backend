@@ -13,6 +13,21 @@ The following issues have been fixed:
 
 ## 🚀 Deployment Steps
 
+### Important: File Uploads in Serverless
+
+**⚠️ Vercel's filesystem is read-only except for `/tmp`**
+
+The app now automatically detects serverless environments and uses `/tmp/uploads` instead of `./uploads`. However, note:
+
+- Files in `/tmp` are **ephemeral** - they're deleted after the function finishes
+- For production, you should use cloud storage (AWS S3, Cloudinary, etc.)
+- Local development still uses `./uploads` folder
+
+**Recommended for production:**
+1. Use a service like Cloudinary, AWS S3, or Google Cloud Storage
+2. Update `multer.js` to use a cloud storage adapter
+3. Or use Vercel Blob Storage: https://vercel.com/docs/storage/vercel-blob
+
 ### 1. Set Environment Variables in Vercel
 
 Go to your Vercel project → Settings → Environment Variables and add:

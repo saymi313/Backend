@@ -2,31 +2,54 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directories exist
+// Determine base upload directory
+// In serverless (Vercel), use /tmp which is writable
+// In local development, use ./uploads
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const baseUploadDir = isServerless ? '/tmp/uploads' : 'uploads';
+
+// Ensure upload directories exist (safe for both local and serverless)
 const uploadDirs = [
-  'uploads',
-  'uploads/services',
-  'uploads/services/images',
-  'uploads/avatars',
-  'uploads/documents'
+  baseUploadDir,
+  `${baseUploadDir}/services`,
+  `${baseUploadDir}/services/images`,
+  `${baseUploadDir}/avatars`,
+  `${baseUploadDir}/documents`
 ];
 
-uploadDirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+// Create directories lazily (only when needed)
+const ensureUploadDirs = () => {
+  uploadDirs.forEach(dir => {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not create upload directory ${dir}:`, error.message);
+    }
+  });
+};
+
+// Don't create directories at module load in serverless - do it on first upload
+if (!isServerless) {
+  ensureUploadDirs();
+}
 
 // Storage configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    let uploadPath = 'uploads/services/images';
+    // Ensure directories exist on first upload
+    if (isServerless) {
+      ensureUploadDirs();
+    }
+    
+    let uploadPath = `${baseUploadDir}/services/images`;
     
     // Different paths for different file types
     if (file.fieldname === 'avatar') {
-      uploadPath = 'uploads/avatars';
+      uploadPath = `${baseUploadDir}/avatars`;
     } else if (file.fieldname === 'document') {
-      uploadPath = 'uploads/documents';
+      uploadPath = `${baseUploadDir}/documents`;
     }
     
     cb(null, uploadPath);
