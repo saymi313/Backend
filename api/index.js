@@ -1,6 +1,7 @@
 // Wrap everything in try-catch to handle initialization errors
 let initError = null;
 let app = null;
+let wrappedApp = null;
 
 try {
   const { validateEnvironment } = require('../src/shared/config/environment');
@@ -18,26 +19,57 @@ try {
   console.log('✅ App loaded successfully');
   
   const connectDB = require('../src/shared/config/database');
+  const mongoose = require('mongoose');
 
-  // Connect to database when the serverless function is initialized
-  // This connection will be reused across invocations
-  let dbConnected = false;
-
-  const connectDatabase = async () => {
-    if (!dbConnected) {
-      try {
-        await connectDB();
-        dbConnected = true;
-        console.log('✅ Database connected in serverless function');
-      } catch (error) {
-        console.error('❌ Database connection error in serverless function:', error);
-        // Don't throw - allow the function to continue
-      }
+  // Connect to database immediately (connection will be reused across invocations)
+  let dbConnectionPromise = null;
+  
+  const ensureDBConnection = async () => {
+    // If already connected, return immediately
+    if (mongoose.connection.readyState === 1) {
+      return;
     }
+    
+    // If connection is in progress, wait for it
+    if (dbConnectionPromise) {
+      return dbConnectionPromise;
+    }
+    
+    // Start new connection
+    dbConnectionPromise = connectDB()
+      .then(() => {
+        console.log('✅ Database connected in serverless function');
+      })
+      .catch((error) => {
+        console.error('❌ Database connection error:', error.message);
+        dbConnectionPromise = null; // Reset so it can retry
+        throw error;
+      });
+    
+    return dbConnectionPromise;
   };
 
-  // Initialize database connection
-  connectDatabase();
+  // Start connecting immediately (don't wait for first request)
+  ensureDBConnection().catch(err => {
+    console.error('Initial DB connection failed:', err.message);
+  });
+
+  // Wrap the app to ensure DB is connected before handling requests
+  wrappedApp = async (req, res) => {
+    try {
+      // Ensure database is connected before processing request
+      await ensureDBConnection();
+      // Handle the request with the app
+      return app(req, res);
+    } catch (error) {
+      console.error('Request handler error:', error);
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection failed',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable'
+      });
+    }
+  };
 
 } catch (error) {
   initError = error;
@@ -45,7 +77,7 @@ try {
   console.error('Stack:', error.stack);
 }
 
-// Export error handler if initialization failed, otherwise export app
+// Export error handler if initialization failed, otherwise export wrapped app
 if (initError || !app) {
   module.exports = (req, res) => {
     res.status(500).json({
@@ -56,8 +88,7 @@ if (initError || !app) {
     });
   };
 } else {
-  // For Vercel serverless functions, we export the app directly
-  // Vercel will handle the server creation
-  module.exports = app;
+  // Export the wrapped app that ensures DB connection
+  module.exports = wrappedApp;
 }
 

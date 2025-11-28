@@ -4,10 +4,17 @@ const { sendSuccessResponse, sendErrorResponse, sendValidationError } = require(
 const { SUCCESS_MESSAGES, ERROR_MESSAGES } = require('../../shared/utils/constants/messages');
 const { USER_ROLES } = require('../../shared/utils/constants/roles');
 const { validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 
 // Register user (mentee or mentor)
 const register = async (req, res) => {
   try {
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error('Database not connected. ReadyState:', mongoose.connection.readyState);
+      return sendErrorResponse(res, 'Database connection not ready. Please try again.', 503);
+    }
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -60,7 +67,16 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    sendErrorResponse(res, ERROR_MESSAGES.INTERNAL_SERVER_ERROR, 500);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Return more specific error in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `${ERROR_MESSAGES.INTERNAL_SERVER_ERROR}: ${error.message}`
+      : ERROR_MESSAGES.INTERNAL_SERVER_ERROR;
+    
+    sendErrorResponse(res, errorMessage, 500);
   }
 };
 
