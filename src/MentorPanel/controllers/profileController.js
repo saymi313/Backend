@@ -93,7 +93,7 @@ const getMentorProfile = async (req, res) => {
 
     return sendSuccessResponse(res, 'Mentor profile retrieved successfully', { profile, connectionsCount });
   } catch (error) {
-('Get mentor profile error:', error);
+    console.error('Get mentor profile error:', error);
     return sendErrorResponse(res, 'Failed to retrieve mentor profile', 500);
   }
 };
@@ -141,7 +141,7 @@ const updateMentorProfile = async (req, res) => {
 
     return sendSuccessResponse(res, 'Mentor profile updated successfully', { profile });
   } catch (error) {
-('Update mentor profile error:', error);
+    console.error('Update mentor profile error:', error);
     return sendErrorResponse(res, 'Failed to update mentor profile', 500);
   }
 };
@@ -168,7 +168,7 @@ const addEducation = async (req, res) => {
       education: profile.education[profile.education.length - 1] 
     });
   } catch (error) {
-('Add education error:', error);
+    console.error('Add education error:', error);
     return sendErrorResponse(res, 'Failed to add education', 500);
   }
 };
@@ -203,7 +203,7 @@ const updateEducation = async (req, res) => {
       education: profile.education[educationIndex] 
     });
   } catch (error) {
-('Update education error:', error);
+    console.error('Update education error:', error);
     return sendErrorResponse(res, 'Failed to update education', 500);
   }
 };
@@ -224,7 +224,7 @@ const deleteEducation = async (req, res) => {
 
     return sendSuccessResponse(res, 'Education deleted successfully');
   } catch (error) {
-('Delete education error:', error);
+    console.error('Delete education error:', error);
     return sendErrorResponse(res, 'Failed to delete education', 500);
   }
 };
@@ -259,7 +259,7 @@ const addExperience = async (req, res) => {
       experience: profile.experience[profile.experience.length - 1] 
     });
   } catch (error) {
-('Add experience error:', error);
+    console.error('Add experience error:', error);
     return sendErrorResponse(res, 'Failed to add experience', 500);
   }
 };
@@ -296,7 +296,7 @@ const updateExperience = async (req, res) => {
       experience: profile.experience[experienceIndex] 
     });
   } catch (error) {
-('Update experience error:', error);
+    console.error('Update experience error:', error);
     return sendErrorResponse(res, 'Failed to update experience', 500);
   }
 };
@@ -317,7 +317,7 @@ const deleteExperience = async (req, res) => {
 
     return sendSuccessResponse(res, 'Experience deleted successfully');
   } catch (error) {
-('Delete experience error:', error);
+    console.error('Delete experience error:', error);
     return sendErrorResponse(res, 'Failed to delete experience', 500);
   }
 };
@@ -344,7 +344,7 @@ const addAchievement = async (req, res) => {
       achievement: profile.achievements[profile.achievements.length - 1] 
     });
   } catch (error) {
-('Add achievement error:', error);
+    console.error('Add achievement error:', error);
     return sendErrorResponse(res, 'Failed to add achievement', 500);
   }
 };
@@ -365,7 +365,7 @@ const deleteAchievement = async (req, res) => {
 
     return sendSuccessResponse(res, 'Achievement deleted successfully');
   } catch (error) {
-('Delete achievement error:', error);
+    console.error('Delete achievement error:', error);
     return sendErrorResponse(res, 'Failed to delete achievement', 500);
   }
 };
@@ -391,7 +391,7 @@ const updateAvailability = async (req, res) => {
       availability: profile.availability 
     });
   } catch (error) {
-('Update availability error:', error);
+    console.error('Update availability error:', error);
     return sendErrorResponse(res, 'Failed to update availability', 500);
   }
 };

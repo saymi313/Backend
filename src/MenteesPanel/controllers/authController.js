@@ -59,7 +59,7 @@ const register = async (req, res) => {
       }
     });
   } catch (error) {
-('Registration error:', error);
+    console.error('Registration error:', error);
     sendErrorResponse(res, ERROR_MESSAGES.INTERNAL_SERVER_ERROR, 500);
   }
 };
@@ -113,7 +113,7 @@ const login = async (req, res) => {
       }
     });
   } catch (error) {
-('Login error:', error);
+    console.error('Login error:', error);
     sendErrorResponse(res, ERROR_MESSAGES.INTERNAL_SERVER_ERROR, 500);
   }
 };
@@ -140,7 +140,7 @@ const getMe = async (req, res) => {
       }
     });
   } catch (error) {
-('Get me error:', error);
+    console.error('Get me error:', error);
     sendErrorResponse(res, ERROR_MESSAGES.INTERNAL_SERVER_ERROR, 500);
   }
 };
