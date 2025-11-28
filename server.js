@@ -3,6 +3,10 @@ const connectDB = require('./src/shared/config/database');
 const { initializeSocket } = require('./src/shared/config/socket');
 const { initializeSocketHandlers } = require('./src/shared/services/socketHandlers');
 const { startScheduledJobs } = require('./src/shared/services/schedulerService');
+const { validateEnvironment } = require('./src/shared/config/environment');
+
+// Validate environment variables before starting server
+validateEnvironment();
 
 const PORT = process.env.PORT || 5000;
 

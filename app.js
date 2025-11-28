@@ -8,11 +8,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const errorHandler = require('./src/shared/middlewares/errorHandler');
-const { validateEnvironment } = require('./src/shared/config/environment');
 const passport = require('./src/shared/config/passport');
-
-// Validate environment variables
-validateEnvironment();
 
 const app = express();
 

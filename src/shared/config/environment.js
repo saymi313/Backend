@@ -16,8 +16,9 @@ const validateEnvironment = () => {
   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
   
   if (missingVars.length > 0) {
-    console.error('Missing required environment variables:', missingVars);
-    process.exit(1);
+    const errorMsg = `Missing required environment variables: ${missingVars.join(', ')}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
   
   // Warn about missing optional Google OAuth variables
