@@ -21,8 +21,8 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://yourdomain.com']
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
@@ -70,6 +70,9 @@ app.get('/health', (req, res) => {
     uptime: process.uptime()
   });
 });
+
+// Ignore favicon requests
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // API Routes
 // Shared Routes
