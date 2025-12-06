@@ -22,7 +22,7 @@ app.use(helmet());
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://scholarslee.com', 'https://www.scholarslee.com']
+    ? ['https://scholarslee.com', 'https://www.scholarslee.com', 'http://localhost:3000']
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
