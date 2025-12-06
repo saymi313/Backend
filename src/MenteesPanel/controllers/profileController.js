@@ -57,8 +57,8 @@ const createMenteeProfile = async (req, res) => {
     // Populate user data
     await menteeProfile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
 
-    return sendSuccessResponse(res, 'Mentee profile created successfully', { 
-      profile: menteeProfile 
+    return sendSuccessResponse(res, 'Mentee profile created successfully', {
+      profile: menteeProfile
     }, 201);
   } catch (error) {
     return sendErrorResponse(res, 'Failed to create mentee profile', 500);
@@ -140,9 +140,12 @@ const updateMenteeProfile = async (req, res) => {
       socialLinks
     } = req.body;
 
-    const profile = await MenteeProfile.findOne({ userId });
+    let profile = await MenteeProfile.findOne({ userId });
+
+    // If profile doesn't exist, create a new one (Upsert)
     if (!profile) {
-      return sendErrorResponse(res, 'Mentee profile not found', 404);
+      console.log('Creating new mentee profile for user:', userId);
+      profile = new MenteeProfile({ userId, educationLevel: educationLevel || 'Other' });
     }
 
     // Update simple fields
@@ -164,11 +167,21 @@ const updateMenteeProfile = async (req, res) => {
     if (socialLinks) profile.socialLinks = socialLinks;
 
     await profile.save();
-    await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+
+    // Check if population is possible (sometimes fails if user ref is broken)
+    try {
+      await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+    } catch (popError) {
+      console.warn('Population failed in updateMenteeProfile:', popError.message);
+    }
 
     return sendSuccessResponse(res, 'Mentee profile updated successfully', { profile });
   } catch (error) {
-    return sendErrorResponse(res, 'Failed to update mentee profile', 500);
+    console.error('Error updating mentee profile:', error);
+    if (error.name === 'ValidationError') {
+      return sendErrorResponse(res, error.message, 400);
+    }
+    return sendErrorResponse(res, 'Failed to update mentee profile: ' + error.message, 500);
   }
 };
 
@@ -190,8 +203,8 @@ const updateStudyGoals = async (req, res) => {
     profile.studyGoals = studyGoals;
     await profile.save();
 
-    return sendSuccessResponse(res, 'Study goals updated successfully', { 
-      studyGoals: profile.studyGoals 
+    return sendSuccessResponse(res, 'Study goals updated successfully', {
+      studyGoals: profile.studyGoals
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update study goals', 500);
@@ -216,8 +229,8 @@ const updateTargetCountries = async (req, res) => {
     profile.targetCountries = targetCountries;
     await profile.save();
 
-    return sendSuccessResponse(res, 'Target countries updated successfully', { 
-      targetCountries: profile.targetCountries 
+    return sendSuccessResponse(res, 'Target countries updated successfully', {
+      targetCountries: profile.targetCountries
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update target countries', 500);
@@ -242,8 +255,8 @@ const updateAcademicInterests = async (req, res) => {
     profile.academicInterests = academicInterests;
     await profile.save();
 
-    return sendSuccessResponse(res, 'Academic interests updated successfully', { 
-      academicInterests: profile.academicInterests 
+    return sendSuccessResponse(res, 'Academic interests updated successfully', {
+      academicInterests: profile.academicInterests
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update academic interests', 500);
@@ -268,8 +281,8 @@ const updateCareerGoals = async (req, res) => {
     profile.careerGoals = careerGoals;
     await profile.save();
 
-    return sendSuccessResponse(res, 'Career goals updated successfully', { 
-      careerGoals: profile.careerGoals 
+    return sendSuccessResponse(res, 'Career goals updated successfully', {
+      careerGoals: profile.careerGoals
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update career goals', 500);
@@ -294,8 +307,8 @@ const updatePreferences = async (req, res) => {
     profile.preferences = { ...profile.preferences, ...preferences };
     await profile.save();
 
-    return sendSuccessResponse(res, 'Preferences updated successfully', { 
-      preferences: profile.preferences 
+    return sendSuccessResponse(res, 'Preferences updated successfully', {
+      preferences: profile.preferences
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update preferences', 500);
@@ -320,8 +333,8 @@ const updateChallenges = async (req, res) => {
     profile.challenges = challenges;
     await profile.save();
 
-    return sendSuccessResponse(res, 'Challenges updated successfully', { 
-      challenges: profile.challenges 
+    return sendSuccessResponse(res, 'Challenges updated successfully', {
+      challenges: profile.challenges
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to update challenges', 500);
@@ -335,7 +348,7 @@ const getProfileCompleteness = async (req, res) => {
 
     const profile = await MenteeProfile.findOne({ userId });
     if (!profile) {
-      return sendSuccessResponse(res, 'Profile completeness retrieved', { 
+      return sendSuccessResponse(res, 'Profile completeness retrieved', {
         completeness: 0,
         missingFields: ['educationLevel', 'studyGoals', 'targetCountries']
       });
@@ -350,7 +363,7 @@ const getProfileCompleteness = async (req, res) => {
     if (!profile.academicInterests || profile.academicInterests.length === 0) missingFields.push('academicInterests');
     if (!profile.careerGoals || profile.careerGoals.length === 0) missingFields.push('careerGoals');
 
-    return sendSuccessResponse(res, 'Profile completeness retrieved', { 
+    return sendSuccessResponse(res, 'Profile completeness retrieved', {
       completeness,
       missingFields
     });

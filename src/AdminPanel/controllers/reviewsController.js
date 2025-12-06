@@ -3,6 +3,7 @@ const MentorService = require('../../MentorPanel/models/Service');
 const User = require('../../shared/models/User');
 const ContactMessage = require('../../shared/models/ContactMessage');
 const Notification = require('../../shared/models/Notification');
+const emailService = require('../../shared/services/emailService');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 
 // Get all feedbacks with filtering
@@ -12,7 +13,7 @@ const getAllFeedbacks = async (req, res) => {
 
     // Build query
     const query = { isActive: true };
-    
+
     if (minRating) {
       query.rating = { $gte: parseInt(minRating) };
     }
@@ -37,7 +38,7 @@ const getAllFeedbacks = async (req, res) => {
     const formattedFeedbacks = feedbacks.map(feedback => ({
       id: feedback._id.toString(),
       service: feedback.serviceId?.title || 'N/A',
-      mentor: feedback.mentorId 
+      mentor: feedback.mentorId
         ? `${feedback.mentorId.profile?.firstName || ''} ${feedback.mentorId.profile?.lastName || ''}`.trim() || feedback.mentorId.email
         : 'N/A',
       mentee: feedback.menteeId
@@ -164,7 +165,7 @@ const getContactMessages = async (req, res) => {
 
     // Build query
     const query = { isActive: true };
-    
+
     if (status) {
       query.status = status;
     }
@@ -238,13 +239,13 @@ const respondToContactMessage = async (req, res) => {
 
     // Send notification to user if userId exists, or try to find user by email
     let targetUserId = contactMessage.userId;
-    
+
     // If no userId but email exists, try to find user by email
     if (!targetUserId && contactMessage.email) {
       try {
-        const userByEmail = await User.findOne({ 
+        const userByEmail = await User.findOne({
           email: contactMessage.email.toLowerCase().trim(),
-          isActive: true 
+          isActive: true
         });
         if (userByEmail) {
           targetUserId = userByEmail._id;
@@ -258,8 +259,8 @@ const respondToContactMessage = async (req, res) => {
     if (targetUserId) {
       try {
         // Truncate response for notification message if too long
-        const responsePreview = response.trim().length > 150 
-          ? response.trim().substring(0, 150) + '...' 
+        const responsePreview = response.trim().length > 150
+          ? response.trim().substring(0, 150) + '...'
           : response.trim();
 
         const notificationData = {
@@ -284,7 +285,7 @@ const respondToContactMessage = async (req, res) => {
         };
 
         const notification = await Notification.createNotification(notificationData);
-        
+
         console.log(`✅ Notification created successfully:`);
         console.log(`   - Notification ID: ${notification._id}`);
         console.log(`   - User ID: ${targetUserId}`);
@@ -300,6 +301,20 @@ const respondToContactMessage = async (req, res) => {
       }
     } else {
       console.log(`⚠️ No user found for contact message ${contactMessage._id} (email: ${contactMessage.email}). Notification not sent.`);
+    }
+
+    // Send email response
+    if (contactMessage.email) {
+      try {
+        await emailService.sendContactResponseEmail(
+          contactMessage.email,
+          contactMessage.name,
+          contactMessage.subject,
+          response.trim()
+        );
+      } catch (emailError) {
+        console.error('❌ Failed to send contact response email:', emailError);
+      }
     }
 
     return sendSuccessResponse(res, 'Response sent successfully', {

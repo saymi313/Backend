@@ -263,7 +263,11 @@ const sendMessage = async (req, res) => {
     
     // Get receiver's info to determine the correct action URL
     const receiver = await User.findById(receiverId).select('role');
-    const actionUrl = receiver?.role === 'mentor' ? '/mentor/chats' : '/mentees/chats';
+    // Use environment variable or default based on role
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const actionUrl = receiver?.role === 'mentor' 
+      ? `${frontendUrl}/mentor/chats` 
+      : `${frontendUrl}/mentees/chats`;
     
     // Create notification for receiver
     const notification = await Notification.create({

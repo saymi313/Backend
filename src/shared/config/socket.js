@@ -1,6 +1,8 @@
 const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
 
 // Store active socket connections
 const activeUsers = new Map(); // userId -> socketId
@@ -26,8 +28,6 @@ const initializeSocket = (server) => {
       const JWT_SECRET = process.env.JWT_SECRET;
       
       console.log('🔐 Socket auth attempt - Token preview:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
-      console.log('🔐 JWT_SECRET available:', !!JWT_SECRET);
-      console.log('🔐 JWT_SECRET value:', JWT_SECRET ? JWT_SECRET.substring(0, 10) + '...' : 'UNDEFINED');
       
       if (!token) {
         console.error('❌ No token provided in socket handshake');
@@ -89,6 +89,85 @@ const initializeSocket = (server) => {
     // Handle errors
     socket.on('error', (error) => {
       console.error(`Socket error for user ${socket.userId}:`, error);
+    });
+
+    // Handle typing indicators
+    socket.on('typing:start', ({ conversationId, receiverId }) => {
+      console.log(`User ${socket.userId} started typing in ${conversationId}`);
+      emitToUser(receiverId, 'typing:start', {
+        conversationId,
+        userId: socket.userId
+      });
+    });
+
+    socket.on('typing:stop', ({ conversationId, receiverId }) => {
+      console.log(`User ${socket.userId} stopped typing in ${conversationId}`);
+      emitToUser(receiverId, 'typing:stop', {
+        conversationId,
+        userId: socket.userId
+      });
+    });
+
+    // Handle message delivery and read receipts
+    socket.on('message:delivered', async ({ messageId, conversationId }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (message && !message.isDelivered) {
+          message.isDelivered = true;
+          message.deliveredAt = new Date();
+          await message.save();
+
+          // Notify sender
+          emitToUser(message.sender.toString(), 'message:status', {
+            messageId,
+            conversationId,
+            status: 'delivered',
+            timestamp: message.deliveredAt
+          });
+        }
+      } catch (error) {
+        console.error('Error marking message as delivered:', error);
+      }
+    });
+
+    socket.on('message:read', async ({ messageId, conversationId }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (message && !message.isRead) {
+          await message.markAsRead();
+
+          // Notify sender
+          emitToUser(message.sender.toString(), 'message:status', {
+            messageId,
+            conversationId,
+            status: 'read',
+            timestamp: message.readAt
+          });
+        }
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+      }
+    });
+
+    // Handle conversation room joining (for future use)
+    socket.on('conversation:join', ({ conversationId }) => {
+      console.log(`User ${socket.userId} joined conversation ${conversationId}`);
+      socket.join(`conversation:${conversationId}`);
+    });
+
+    socket.on('conversation:leave', ({ conversationId }) => {
+      console.log(`User ${socket.userId} left conversation ${conversationId}`);
+      socket.leave(`conversation:${conversationId}`);
+    });
+
+    // Handle user status updates
+    socket.on('user:status', ({ status }) => {
+      console.log(`User ${socket.userId} status: ${status}`);
+      socket.broadcast.emit('user:status:changed', {
+        userId: socket.userId,
+        status,
+        timestamp: new Date()
+      });
     });
   });
 

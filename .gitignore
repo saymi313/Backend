@@ -9,6 +9,8 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.log
+*.txt
+temp_*
 
 PHASE1_COMPLETE_SUMMARY.md
 PHASE3_IMPLEMENTATION_COMPLETE.md

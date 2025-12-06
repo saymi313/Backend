@@ -77,11 +77,15 @@ const menteeProfileSchema = new mongoose.Schema({
   timeline: {
     type: String,
     enum: [
+      'Immediate',
+      'Short-term',
+      'Medium-term',
+      'Long-term',
+      'Flexible',
       'Immediate (within 3 months)',
       'Short-term (3-6 months)',
       'Medium-term (6-12 months)',
-      'Long-term (1-2 years)',
-      'Flexible'
+      'Long-term (1-2 years)'
     ],
     default: 'Flexible'
   },
@@ -110,8 +114,8 @@ const menteeProfileSchema = new mongoose.Schema({
 });
 
 // Index for search functionality
-menteeProfileSchema.index({ 
-  studyGoals: 'text', 
+menteeProfileSchema.index({
+  studyGoals: 'text',
   academicInterests: 'text',
   careerGoals: 'text'
 });
@@ -121,12 +125,12 @@ menteeProfileSchema.index({ educationLevel: 1 });
 menteeProfileSchema.index({ isActive: 1 });
 
 // Virtual for full name (populated from User)
-menteeProfileSchema.virtual('fullName').get(function() {
+menteeProfileSchema.virtual('fullName').get(function () {
   return this.userId?.profile?.firstName + ' ' + this.userId?.profile?.lastName;
 });
 
 // Method to calculate profile completeness
-menteeProfileSchema.methods.calculateCompleteness = function() {
+menteeProfileSchema.methods.calculateCompleteness = function () {
   let completeness = 0;
   const fields = [
     'educationLevel',
@@ -136,19 +140,19 @@ menteeProfileSchema.methods.calculateCompleteness = function() {
     'careerGoals',
     'timeline'
   ];
-  
+
   fields.forEach(field => {
     if (this[field] && (Array.isArray(this[field]) ? this[field].length > 0 : this[field])) {
       completeness += (100 / fields.length);
     }
   });
-  
+
   this.profileCompleteness = Math.round(completeness);
   return this.profileCompleteness;
 };
 
 // Method to add study goal
-menteeProfileSchema.methods.addStudyGoal = function(goal) {
+menteeProfileSchema.methods.addStudyGoal = function (goal) {
   if (!this.studyGoals.includes(goal)) {
     this.studyGoals.push(goal);
   }
@@ -156,13 +160,13 @@ menteeProfileSchema.methods.addStudyGoal = function(goal) {
 };
 
 // Method to remove study goal
-menteeProfileSchema.methods.removeStudyGoal = function(goal) {
+menteeProfileSchema.methods.removeStudyGoal = function (goal) {
   this.studyGoals = this.studyGoals.filter(g => g !== goal);
   return this.save();
 };
 
 // Method to add target country
-menteeProfileSchema.methods.addTargetCountry = function(country) {
+menteeProfileSchema.methods.addTargetCountry = function (country) {
   if (!this.targetCountries.includes(country)) {
     this.targetCountries.push(country);
   }
@@ -170,13 +174,13 @@ menteeProfileSchema.methods.addTargetCountry = function(country) {
 };
 
 // Method to remove target country
-menteeProfileSchema.methods.removeTargetCountry = function(country) {
+menteeProfileSchema.methods.removeTargetCountry = function (country) {
   this.targetCountries = this.targetCountries.filter(c => c !== country);
   return this.save();
 };
 
 // Pre-save middleware to calculate completeness
-menteeProfileSchema.pre('save', function(next) {
+menteeProfileSchema.pre('save', function (next) {
   this.calculateCompleteness();
   next();
 });
