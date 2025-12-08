@@ -192,28 +192,36 @@ const mentorProfileSchema = new mongoose.Schema({
 });
 
 // Index for search functionality
-mentorProfileSchema.index({ 
-  title: 'text', 
-  bio: 'text', 
-  specializations: 'text' 
+mentorProfileSchema.index({
+  title: 'text',
+  bio: 'text',
+  specializations: 'text'
 });
 
 mentorProfileSchema.index({ isVerified: 1, isActive: 1 });
 mentorProfileSchema.index({ rating: -1 });
 
+// Compound index for landing page query optimization
+mentorProfileSchema.index({
+  isActive: 1,
+  isVerified: 1,
+  rating: -1,
+  totalReviews: -1
+});
+
 // Virtual for full name (populated from User)
-mentorProfileSchema.virtual('fullName').get(function() {
+mentorProfileSchema.virtual('fullName').get(function () {
   return this.userId?.profile?.firstName + ' ' + this.userId?.profile?.lastName;
 });
 
 // Method to calculate average rating
-mentorProfileSchema.methods.calculateRating = function() {
+mentorProfileSchema.methods.calculateRating = function () {
   // This would be implemented when reviews are added
   return this.rating;
 };
 
 // Method to add specialization
-mentorProfileSchema.methods.addSpecialization = function(specialization) {
+mentorProfileSchema.methods.addSpecialization = function (specialization) {
   if (!this.specializations.includes(specialization)) {
     this.specializations.push(specialization);
   }
@@ -221,7 +229,7 @@ mentorProfileSchema.methods.addSpecialization = function(specialization) {
 };
 
 // Method to remove specialization
-mentorProfileSchema.methods.removeSpecialization = function(specialization) {
+mentorProfileSchema.methods.removeSpecialization = function (specialization) {
   this.specializations = this.specializations.filter(spec => spec !== specialization);
   return this.save();
 };

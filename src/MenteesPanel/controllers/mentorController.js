@@ -4,13 +4,13 @@ const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/h
 // Get all verified mentors (public)
 const getAllMentors = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 12, 
-      specialization, 
-      country, 
-      rating, 
-      search 
+    const {
+      page = 1,
+      limit = 12,
+      specialization,
+      country,
+      rating,
+      search
     } = req.query;
 
     let query = { isActive: true, isVerified: true };
@@ -36,22 +36,33 @@ const getAllMentors = async (req, res) => {
       ];
     }
 
+    // Optimize query for landing page (small limits)
+    const isSmallLimit = limit <= 10;
+
     const mentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('-verificationDocuments')
+      .select('title rating totalReviews userId')
+      .lean() // Convert to plain JS objects for better performance
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await MentorProfile.countDocuments(query);
+    // Skip count query for small limits (landing page optimization)
+    let total = 0;
+    let pagination = null;
 
-    return sendSuccessResponse(res, 'Mentors retrieved successfully', {
-      mentors,
-      pagination: {
+    if (!isSmallLimit) {
+      total = await MentorProfile.countDocuments(query);
+      pagination = {
         current: parseInt(page),
         pages: Math.ceil(total / limit),
         total
-      }
+      };
+    }
+
+    return sendSuccessResponse(res, 'Mentors retrieved successfully', {
+      mentors,
+      ...(pagination && { pagination })
     });
   } catch (error) {
     console.error('Get all mentors error:', error);
@@ -66,14 +77,14 @@ const getMentorById = async (req, res) => {
 
     console.log('🔍 Fetching mentor profile for ID:', id);
 
-    const mentor = await MentorProfile.findOne({ 
-      _id: id, 
-      isActive: true 
+    const mentor = await MentorProfile.findOne({
+      _id: id,
+      isActive: true
     })
-    .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email')
-    .populate('connections', 'profile.firstName profile.lastName profile.avatar email')
-    .populate('services')
-    .select('-verificationDocuments');
+      .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email')
+      .populate('connections', 'profile.firstName profile.lastName profile.avatar email')
+      .populate('services')
+      .select('-verificationDocuments');
 
     if (!mentor) {
       console.log('❌ Mentor not found');
@@ -91,21 +102,21 @@ const getMentorById = async (req, res) => {
 // Search mentors
 const searchMentors = async (req, res) => {
   try {
-    const { 
-      q, 
-      page = 1, 
-      limit = 12, 
-      specialization, 
-      country, 
-      rating 
+    const {
+      q,
+      page = 1,
+      limit = 12,
+      specialization,
+      country,
+      rating
     } = req.query;
 
     if (!q) {
       return sendErrorResponse(res, 'Search query is required', 400);
     }
 
-    let query = { 
-      isActive: true, 
+    let query = {
+      isActive: true,
       isVerified: true,
       $or: [
         { title: { $regex: q, $options: 'i' } },
@@ -198,7 +209,7 @@ const getMentorSpecializations = async (req, res) => {
       { $limit: 20 }
     ]);
 
-    return sendSuccessResponse(res, 'Specializations retrieved successfully', { 
+    return sendSuccessResponse(res, 'Specializations retrieved successfully', {
       specializations: specializations.map(s => ({ name: s._id, count: s.count }))
     });
   } catch (error) {
@@ -212,16 +223,16 @@ const getFeaturedMentors = async (req, res) => {
   try {
     const { limit = 6 } = req.query;
 
-    const mentors = await MentorProfile.find({ 
-      isActive: true, 
+    const mentors = await MentorProfile.find({
+      isActive: true,
       isVerified: true,
       rating: { $gte: 4.0 },
       totalReviews: { $gte: 5 }
     })
-    .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-    .select('-verificationDocuments')
-    .sort({ rating: -1, totalReviews: -1 })
-    .limit(parseInt(limit));
+      .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
+      .select('-verificationDocuments')
+      .sort({ rating: -1, totalReviews: -1 })
+      .limit(parseInt(limit));
 
     return sendSuccessResponse(res, 'Featured mentors retrieved successfully', { mentors });
   } catch (error) {
