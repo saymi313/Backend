@@ -74,8 +74,13 @@ app.get('/health', (req, res) => {
 // Ignore favicon requests
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// Serve uploaded files as static assets
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // API Routes
 // Shared Routes
+app.use('/api/upload', require('./src/shared/routes/uploadRoutes')); // File upload routes
 app.use('/api/users', require('./src/shared/routes/userRoutes'));
 app.use('/api/notifications', require('./src/shared/routes/notificationRoutes'));
 app.use('/api/chat', require('./src/shared/routes/chatRoutes')); // Chat routes for both mentors and mentees
