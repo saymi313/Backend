@@ -10,69 +10,86 @@ const { validationResult } = require('express-validator');
 // Register mentor
 const register = async (req, res) => {
   try {
+    console.log('📝 Mentor registration started for:', req.body.email);
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return sendValidationError(res, errors.array());
     }
 
     const { email, password, firstName, lastName } = req.body;
 
-    // Check if user already exists
+    // Check if user already exists in User collection
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('❌ User already exists in User collection:', email);
       return sendErrorResponse(res, ERROR_MESSAGES.USER_ALREADY_EXISTS, 400);
     }
 
-    // Create mentor user with pending approval status
-    const user = await User.create({
+    // Generate verification OTP
+    const emailService = require('../../shared/services/emailService');
+    const verificationOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    console.log('✅ Generated OTP for mentor registration');
+
+    // Check feature flag for mentor verification
+    const Settings = require('../../shared/models/Settings');
+    const settings = await Settings.getSettings();
+    const requiresApproval = settings.featureFlags?.enableMentorVerification ?? true;
+
+    console.log(`🔧 Feature Flag - enableMentorVerification: ${requiresApproval}`);
+
+    // Create/update pending user (not actual user yet)
+    const PendingUser = require('../../shared/models/PendingUser');
+    const pendingUser = await PendingUser.createPendingUser({
       email,
       password,
       role: USER_ROLES.MENTOR,
-      mentorApprovalStatus: 'pending', // New mentors require admin approval
+      mentorApprovalStatus: requiresApproval ? 'pending' : 'approved', // Auto-approve if flag is disabled
       profile: {
         firstName,
         lastName
-      }
+      },
+      verificationOTP,
+      verificationOTPExpires
     });
+    console.log(`✅ Pending mentor created: ${pendingUser._id} (Approval: ${pendingUser.mentorApprovalStatus})`);
 
-    // Notify admin about new mentor signup
+    // Send verification email
     try {
-      const adminUsers = await User.find({ role: USER_ROLES.ADMIN, isActive: true });
-      if (adminUsers.length > 0) {
-        const adminIds = adminUsers.map(admin => admin._id);
-        await Notification.sendBulk(adminIds, {
-          type: 'mentor_verification',
-          title: 'New Mentor Signup Request',
-          message: `A new mentor "${firstName} ${lastName}" (${email}) has registered and is awaiting approval.`,
-          priority: 'high',
-          deliveryChannels: [{ type: 'in-app', status: 'pending' }],
-          actionUrl: '/admin/mentors',
-          actionText: 'Review Request'
-        });
-      }
-    } catch (notificationError) {
-      console.error('Error sending admin notification for new mentor:', notificationError);
-      // Don't fail registration if notification fails
+      await emailService.sendVerificationEmail(email, verificationOTP);
+      console.log('✅ Verification email sent to mentor');
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      // Pending user is created but email failed. They can use "Resend OTP".
     }
 
-    // Do NOT generate token - mentor must wait for approval
+    // Notify admin about new mentor signup (only if approval is required)
+    if (requiresApproval) {
+      console.log('📧 Mentor requires approval - would send admin notification (not implemented yet)');
+    } else {
+      console.log('✅ Mentor auto-approved - no admin notification needed');
+    }
+
+    // Do NOT generate token - mentor must verify email first, then wait for approval (if required)
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Your account is pending admin approval. You will be notified once approved.',
+      message: 'Registration successful. Please check your email for the verification code.',
       data: {
         user: {
-          id: user._id,
-          email: user.email,
-          role: user.role,
-          profile: user.profile,
-          mentorApprovalStatus: user.mentorApprovalStatus
+          email: pendingUser.email,
+          role: pendingUser.role,
+          profile: pendingUser.profile,
+          isVerified: false,
+          mentorApprovalStatus: pendingUser.mentorApprovalStatus
         }
-        // No token - must wait for approval
+        // No token - must verify email first
       }
     });
   } catch (error) {
-    console.error('Mentor registration error:', error);
+    console.error('❌ Mentor registration error:', error);
     sendErrorResponse(res, ERROR_MESSAGES.INTERNAL_SERVER_ERROR, 500);
   }
 };
@@ -174,7 +191,7 @@ const getMe = async (req, res) => {
           // Decode token to get expiration date
           const decoded = decodeToken(token);
           const expiresAt = decoded.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days if no exp
-          
+
           // Blacklist the token with userId and expiresAt
           await BlacklistedToken.blacklistToken(token, user._id, expiresAt);
         } catch (blacklistError) {
@@ -218,19 +235,19 @@ const getMe = async (req, res) => {
 const logout = async (req, res) => {
   try {
     const authHeader = req.header('Authorization');
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      
+
       try {
         // Decode token to get expiration and user ID
         const decoded = decodeToken(token);
-        
+
         if (decoded && decoded.exp) {
           // Calculate expiration date from token
           const expiresAt = new Date(decoded.exp * 1000);
           const userId = decoded.id;
-          
+
           // Blacklist the token
           await BlacklistedToken.blacklistToken(token, userId, expiresAt);
         }
@@ -240,7 +257,7 @@ const logout = async (req, res) => {
         console.warn('Error blacklisting token during logout:', error.message);
       }
     }
-    
+
     return sendSuccessResponse(res, SUCCESS_MESSAGES.USER_LOGGED_OUT);
   } catch (error) {
     console.error('Logout error:', error);

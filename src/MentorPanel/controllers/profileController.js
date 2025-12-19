@@ -59,8 +59,8 @@ const createMentorProfile = async (req, res) => {
     await mentorProfile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
     await mentorProfile.populate('services');
 
-    return sendSuccessResponse(res, 'Mentor profile created successfully', { 
-      profile: mentorProfile 
+    return sendSuccessResponse(res, 'Mentor profile created successfully', {
+      profile: mentorProfile
     }, 201);
   } catch (error) {
     return sendErrorResponse(res, 'Failed to create mentor profile', 500);
@@ -71,6 +71,7 @@ const createMentorProfile = async (req, res) => {
 const getMentorProfile = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('📁 Getting mentor profile for user:', userId);
 
     let profile = await MentorProfile.findOne({ userId })
       .populate('userId', 'profile.firstName profile.lastName profile.avatar email')
@@ -78,6 +79,7 @@ const getMentorProfile = async (req, res) => {
       .populate('connections', 'profile.firstName profile.lastName profile.avatar email');
 
     if (!profile) {
+      console.log('⚠️  Mentor profile not found for user:', userId);
       return sendErrorResponse(res, 'Mentor profile not found', 404);
     }
 
@@ -90,10 +92,11 @@ const getMentorProfile = async (req, res) => {
 
     // Add connections count for convenience
     const connectionsCount = (profile.connections || []).length;
+    console.log('✅ Profile found with', connectionsCount, 'connections');
 
     return sendSuccessResponse(res, 'Mentor profile retrieved successfully', { profile, connectionsCount });
   } catch (error) {
-('Get mentor profile error:', error);
+    console.error('Get mentor profile error:', error);
     return sendErrorResponse(res, 'Failed to retrieve mentor profile', 500);
   }
 };
@@ -116,12 +119,35 @@ const updateMentorProfile = async (req, res) => {
       successStory
     } = req.body;
 
-    const profile = await MentorProfile.findOne({ userId });
+    let profile = await MentorProfile.findOne({ userId });
+
+    // If profile doesn't exist, create it first
     if (!profile) {
-      return sendErrorResponse(res, 'Mentor profile not found', 404);
+      console.log('Profile not found, creating new profile for user:', userId);
+      profile = new MentorProfile({
+        userId,
+        title: title || 'Mentor',
+        bio: bio || background || 'Experienced mentor ready to help students achieve their goals.',
+        background: background || '',
+        specializations: specializations || [],
+        education: [],
+        experience: [],
+        achievements: [],
+        availability: availability || { timezone: 'UTC', workingHours: '9 AM - 5 PM', daysAvailable: [] },
+        languages: languages || [],
+        socialLinks: socialLinks || {},
+        recommendations: recommendations || [],
+        connections: connections || [],
+        services: services || [],
+        successStory: successStory || undefined
+      });
+      await profile.save();
+      await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+
+      return sendSuccessResponse(res, 'Mentor profile created successfully', { profile });
     }
 
-    // Update fields
+    // Profile exists, update it
     if (title) profile.title = title;
     if (bio) profile.bio = bio;
     if (specializations) profile.specializations = specializations;
@@ -141,7 +167,7 @@ const updateMentorProfile = async (req, res) => {
 
     return sendSuccessResponse(res, 'Mentor profile updated successfully', { profile });
   } catch (error) {
-('Update mentor profile error:', error);
+    console.error('Update mentor profile error:', error);
     return sendErrorResponse(res, 'Failed to update mentor profile', 500);
   }
 };
@@ -164,11 +190,11 @@ const addEducation = async (req, res) => {
     profile.education.push({ degree, institution, year, field, gpa });
     await profile.save();
 
-    return sendSuccessResponse(res, 'Education added successfully', { 
-      education: profile.education[profile.education.length - 1] 
+    return sendSuccessResponse(res, 'Education added successfully', {
+      education: profile.education[profile.education.length - 1]
     });
   } catch (error) {
-('Add education error:', error);
+    ('Add education error:', error);
     return sendErrorResponse(res, 'Failed to add education', 500);
   }
 };
@@ -199,11 +225,11 @@ const updateEducation = async (req, res) => {
 
     await profile.save();
 
-    return sendSuccessResponse(res, 'Education updated successfully', { 
-      education: profile.education[educationIndex] 
+    return sendSuccessResponse(res, 'Education updated successfully', {
+      education: profile.education[educationIndex]
     });
   } catch (error) {
-('Update education error:', error);
+    ('Update education error:', error);
     return sendErrorResponse(res, 'Failed to update education', 500);
   }
 };
@@ -224,7 +250,7 @@ const deleteEducation = async (req, res) => {
 
     return sendSuccessResponse(res, 'Education deleted successfully');
   } catch (error) {
-('Delete education error:', error);
+    ('Delete education error:', error);
     return sendErrorResponse(res, 'Failed to delete education', 500);
   }
 };
@@ -244,22 +270,22 @@ const addExperience = async (req, res) => {
       return sendErrorResponse(res, 'Mentor profile not found', 404);
     }
 
-    profile.experience.push({ 
-      company, 
-      position, 
-      duration, 
-      description, 
-      startDate, 
-      endDate, 
-      isCurrent 
+    profile.experience.push({
+      company,
+      position,
+      duration,
+      description,
+      startDate,
+      endDate,
+      isCurrent
     });
     await profile.save();
 
-    return sendSuccessResponse(res, 'Experience added successfully', { 
-      experience: profile.experience[profile.experience.length - 1] 
+    return sendSuccessResponse(res, 'Experience added successfully', {
+      experience: profile.experience[profile.experience.length - 1]
     });
   } catch (error) {
-('Add experience error:', error);
+    ('Add experience error:', error);
     return sendErrorResponse(res, 'Failed to add experience', 500);
   }
 };
@@ -292,11 +318,11 @@ const updateExperience = async (req, res) => {
 
     await profile.save();
 
-    return sendSuccessResponse(res, 'Experience updated successfully', { 
-      experience: profile.experience[experienceIndex] 
+    return sendSuccessResponse(res, 'Experience updated successfully', {
+      experience: profile.experience[experienceIndex]
     });
   } catch (error) {
-('Update experience error:', error);
+    ('Update experience error:', error);
     return sendErrorResponse(res, 'Failed to update experience', 500);
   }
 };
@@ -317,7 +343,7 @@ const deleteExperience = async (req, res) => {
 
     return sendSuccessResponse(res, 'Experience deleted successfully');
   } catch (error) {
-('Delete experience error:', error);
+    ('Delete experience error:', error);
     return sendErrorResponse(res, 'Failed to delete experience', 500);
   }
 };
@@ -340,11 +366,11 @@ const addAchievement = async (req, res) => {
     profile.achievements.push(achievement);
     await profile.save();
 
-    return sendSuccessResponse(res, 'Achievement added successfully', { 
-      achievement: profile.achievements[profile.achievements.length - 1] 
+    return sendSuccessResponse(res, 'Achievement added successfully', {
+      achievement: profile.achievements[profile.achievements.length - 1]
     });
   } catch (error) {
-('Add achievement error:', error);
+    ('Add achievement error:', error);
     return sendErrorResponse(res, 'Failed to add achievement', 500);
   }
 };
@@ -365,7 +391,7 @@ const deleteAchievement = async (req, res) => {
 
     return sendSuccessResponse(res, 'Achievement deleted successfully');
   } catch (error) {
-('Delete achievement error:', error);
+    ('Delete achievement error:', error);
     return sendErrorResponse(res, 'Failed to delete achievement', 500);
   }
 };
@@ -387,11 +413,11 @@ const updateAvailability = async (req, res) => {
 
     await profile.save();
 
-    return sendSuccessResponse(res, 'Availability updated successfully', { 
-      availability: profile.availability 
+    return sendSuccessResponse(res, 'Availability updated successfully', {
+      availability: profile.availability
     });
   } catch (error) {
-('Update availability error:', error);
+    ('Update availability error:', error);
     return sendErrorResponse(res, 'Failed to update availability', 500);
   }
 };

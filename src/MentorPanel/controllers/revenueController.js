@@ -8,6 +8,16 @@ const toObjectId = (id) => new mongoose.Types.ObjectId(id);
 
 const getMentorRevenueDashboard = async (req, res) => {
   try {
+    // Check feature flag for payouts
+    const Settings = require('../../shared/models/Settings');
+    const settings = await Settings.getSettings();
+    const payoutsEnabled = settings.featureFlags?.enablePayouts ?? true;
+
+    if (!payoutsEnabled) {
+      console.log('⚠️  Revenue/payouts feature is disabled');
+      return sendErrorResponse(res, 'Payout features are currently disabled by administrator', 403);
+    }
+
     const mentorId = req.user.id;
     const mentorObjectId = toObjectId(mentorId);
 
@@ -215,8 +225,8 @@ const getMentorRevenueDashboard = async (req, res) => {
     const menteeIds = recentStudents.map((item) => item._id);
     const menteeProfiles = menteeIds.length
       ? await User.find({ _id: { $in: menteeIds } })
-          .select('profile.firstName profile.lastName profile.country profile.avatar')
-          .lean()
+        .select('profile.firstName profile.lastName profile.country profile.avatar')
+        .lean()
       : [];
 
     const menteeProfileMap = menteeProfiles.reduce((acc, mentee) => {

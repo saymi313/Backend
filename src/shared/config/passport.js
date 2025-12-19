@@ -4,6 +4,11 @@ const User = require('../models/User');
 const { USER_ROLES } = require('../utils/constants/roles');
 
 // Configure Google OAuth Strategy (only if credentials are provided)
+console.log('🔍 PASSPORT.JS INITIALIZATION:');
+console.log('   GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...');
+console.log('   GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING');
+console.log('   GOOGLE_CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL);
+
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CALLBACK_URL) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -13,66 +18,67 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.
     accessType: 'offline',
     prompt: 'consent' // Force consent screen to get refresh token
   }, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Check if user already exists with this Google ID
-    let user = await User.findOne({ googleId: profile.id });
+    try {
+      // Check if user already exists with this Google ID
+      let user = await User.findOne({ googleId: profile.id });
 
-    if (user) {
-      // Update tokens if user exists
-      user.googleAccessToken = accessToken;
-      if (refreshToken) {
-        user.googleRefreshToken = refreshToken;
+      if (user) {
+        // Update tokens if user exists
+        user.googleAccessToken = accessToken;
+        if (refreshToken) {
+          user.googleRefreshToken = refreshToken;
+        }
+        await user.save();
+        return done(null, user);
       }
+
+      // Check if user exists with same email (account linking)
+      user = await User.findOne({ email: profile.emails[0].value.toLowerCase() });
+
+      if (user) {
+        // Link Google account to existing user
+        user.googleId = profile.id;
+        user.authProvider = 'google';
+        user.googleAccessToken = accessToken;
+        if (refreshToken) {
+          user.googleRefreshToken = refreshToken;
+        }
+        user.isVerified = true; // Google emails are verified
+        // Update profile picture if available
+        if (profile.photos && profile.photos[0]) {
+          user.profile.avatar = profile.photos[0].value;
+        }
+        await user.save();
+        return done(null, user);
+      }
+
+      // Create new user
+      const nameParts = profile.displayName ? profile.displayName.split(' ') : [];
+      const firstName = nameParts[0] || profile.name?.givenName || 'User';
+      const lastName = nameParts.slice(1).join(' ') || profile.name?.familyName || '';
+
+      user = new User({
+        googleId: profile.id,
+        email: profile.emails[0].value.toLowerCase(),
+        authProvider: 'google',
+        googleAccessToken: accessToken,
+        googleRefreshToken: refreshToken || null,
+        isVerified: true, // Google emails are verified
+        role: null, // No default role - user will choose
+        needsRoleSelection: true, // Flag for frontend to show role selection
+        profile: {
+          firstName,
+          lastName,
+          avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : ''
+        }
+      });
+
       await user.save();
       return done(null, user);
+    } catch (error) {
+      console.error('Error in Google OAuth strategy:', error);
+      return done(error, null);
     }
-
-    // Check if user exists with same email (account linking)
-    user = await User.findOne({ email: profile.emails[0].value.toLowerCase() });
-
-    if (user) {
-      // Link Google account to existing user
-      user.googleId = profile.id;
-      user.authProvider = 'google';
-      user.googleAccessToken = accessToken;
-      if (refreshToken) {
-        user.googleRefreshToken = refreshToken;
-      }
-      user.isVerified = true; // Google emails are verified
-      // Update profile picture if available
-      if (profile.photos && profile.photos[0]) {
-        user.profile.avatar = profile.photos[0].value;
-      }
-      await user.save();
-      return done(null, user);
-    }
-
-    // Create new user
-    const nameParts = profile.displayName ? profile.displayName.split(' ') : [];
-    const firstName = nameParts[0] || profile.name?.givenName || 'User';
-    const lastName = nameParts.slice(1).join(' ') || profile.name?.familyName || '';
-
-    user = new User({
-      googleId: profile.id,
-      email: profile.emails[0].value.toLowerCase(),
-      authProvider: 'google',
-      googleAccessToken: accessToken,
-      googleRefreshToken: refreshToken || null,
-      isVerified: true, // Google emails are verified
-      role: USER_ROLES.MENTEE, // Default role, can be changed
-      profile: {
-        firstName,
-        lastName,
-        avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : ''
-      }
-    });
-
-    await user.save();
-    return done(null, user);
-  } catch (error) {
-    console.error('Error in Google OAuth strategy:', error);
-    return done(error, null);
-  }
   }));
 } else {
   console.warn('⚠️  Google OAuth credentials not configured. Google sign-in will not be available.');

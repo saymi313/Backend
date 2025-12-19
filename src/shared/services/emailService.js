@@ -19,7 +19,11 @@ const createTransporter = () => {
     },
     tls: {
       rejectUnauthorized: false // Allow self-signed certificates
-    }
+    },
+    // Add timeouts to prevent hanging
+    connectionTimeout: 10000, // 10 seconds to connect
+    greetingTimeout: 10000,   // 10 seconds for greeting
+    socketTimeout: 10000       // 10 seconds for socket inactivity
   });
 };
 
@@ -408,13 +412,25 @@ The Scholarslee Team
  * @param {string} otp - OTP code
  */
 const sendVerificationEmail = async (email, otp) => {
+  console.log('\n🔵 ===== EMAIL SERVICE: Starting Verification Email =====');
+  console.log('📧 Recipient:', email);
+  console.log('🔐 OTP:', otp);
+
   try {
+    console.log('⚙️  Creating transporter...');
     const transporter = createTransporter();
 
     if (!transporter) {
-      console.error('Email transporter not configured');
+      console.error('❌ Email transporter not configured - missing EMAIL_USER or EMAIL_PASS');
       return { success: false, error: 'Email service not configured' };
     }
+    console.log('✅ Transporter created');
+
+    console.log('📝 SMTP Configuration:');
+    console.log('   Host:', process.env.EMAIL_HOST);
+    console.log('   Port:', process.env.EMAIL_PORT);
+    console.log('   User:', process.env.EMAIL_USER);
+    console.log('   From:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
@@ -424,8 +440,17 @@ const sendVerificationEmail = async (email, otp) => {
       html: getVerificationEmailTemplate(otp)
     };
 
+    console.log('📤 Attempting to send email via SMTP...');
+    const sendStartTime = Date.now();
+
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email}: ${info.messageId}`);
+
+    const sendDuration = ((Date.now() - sendStartTime) / 1000).toFixed(2);
+    console.log(`✅ EMAIL SENT SUCCESSFULLY in ${sendDuration}s`);
+    console.log('📬 Message ID:', info.messageId);
+    console.log('📨 Response:', info.response);
+    console.log('🔵 ===== EMAIL SERVICE: Complete =====\n');
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending Verification email:', error);

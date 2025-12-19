@@ -32,17 +32,17 @@ const extractClientConfig = (source) => {
   // Get redirect URIs from file or env
   const redirectUris = candidate.redirect_uris || candidate.redirectUris || [];
   const javascriptOrigins = candidate.javascript_origins || candidate.javascriptOrigins || [];
-  
+
   // Parse javascript origins from env if available
-  const envJavascriptOrigins = process.env.GOOGLE_JAVASCRIPT_ORIGINS 
+  const envJavascriptOrigins = process.env.GOOGLE_JAVASCRIPT_ORIGINS
     ? process.env.GOOGLE_JAVASCRIPT_ORIGINS.split(',').map(origin => origin.trim())
     : [];
-  
+
   const allJavascriptOrigins = [...envJavascriptOrigins, ...javascriptOrigins];
-  const inferredRedirect = allJavascriptOrigins.length > 0 
-    ? `${allJavascriptOrigins[0].replace(/\/$/, '')}/mentor/google-meet/callback` 
+  const inferredRedirect = allJavascriptOrigins.length > 0
+    ? `${allJavascriptOrigins[0].replace(/\/$/, '')}/mentor/google-meet/callback`
     : null;
-  
+
   const fallbackRedirect = process.env.GOOGLE_FALLBACK_REDIRECT_URI || 'http://localhost:3000/mentor/google-meet/callback';
 
   // Prioritize environment variables over file values
@@ -60,12 +60,16 @@ const extractClientConfig = (source) => {
 };
 
 const getGoogleOAuthCredentials = () => {
-  if (cachedCredentials) {
-    return cachedCredentials;
-  }
+  // Always reload from env to ensure freshness during debugging
+  // if (cachedCredentials) { return cachedCredentials; }
 
   const fileCredentials = readCredentialFile();
   const credentials = extractClientConfig(fileCredentials);
+
+  console.log('🔒 Google OAuth Config Loaded:');
+  console.log('   - Client ID:', credentials.clientId ? credentials.clientId.substring(0, 15) + '...' : 'MISSING');
+  console.log('   - Project ID:', credentials.projectId);
+  console.log('   - Redirect URI:', credentials.redirectUri);
 
   cachedCredentials = credentials;
   return credentials;
@@ -91,7 +95,7 @@ const persistTokens = (tokens = {}) => {
       if (tokens.expiry_date || tokens.expiryDate) {
         console.warn(`   GOOGLE_TOKEN_EXPIRY=${tokens.expiry_date || tokens.expiryDate}`);
       }
-      
+
       // Reset cache so the next read picks up new tokens from env
       cachedCredentials = null;
       return true;

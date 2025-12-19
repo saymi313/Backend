@@ -80,6 +80,17 @@ const resetPasswordValidation = [
     .withMessage('Password must be at least 6 characters long')
 ];
 
+// Request logging middleware
+router.use((req, res, next) => {
+  console.log('\n🌐 ===== INCOMING REQUEST =====');
+  console.log('📍 Method:', req.method);
+  console.log('📍 Path:', req.path);
+  console.log('📍 Full URL:', req.originalUrl);
+  console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+  console.log('🌐 =============================\n');
+  next();
+});
+
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);

@@ -15,7 +15,7 @@ const educationSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Graduation year is required'],
     min: [1900, 'Year must be after 1900'],
-    max: [new Date().getFullYear(), 'Year cannot be in the future']
+    max: [new Date().getFullYear() + 10, 'Year cannot be more than 10 years in the future'] // Allow future years for expected graduation
   },
   field: {
     type: String,
@@ -132,7 +132,7 @@ const mentorProfileSchema = new mongoose.Schema({
     },
     proficiency: {
       type: String,
-      enum: ['Beginner', 'Intermediate', 'Advanced', 'Native'],
+      enum: ['Beginner', 'Intermediate', 'Advanced', 'Fluent', 'Native'],
       required: true
     }
   }],

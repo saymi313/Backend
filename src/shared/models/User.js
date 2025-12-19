@@ -47,9 +47,22 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: Object.values(USER_ROLES),
-    required: [true, 'Role is required'],
-    default: USER_ROLES.MENTEE
+    enum: [...Object.values(USER_ROLES), null],  // Allow null for new Google users
+    required: function () {
+      // Role is required for local auth users, optional for Google OAuth
+      return this.authProvider === 'local';
+    },
+    validate: {
+      validator: function (value) {
+        // If Google OAuth and role is null, that's fine (they'll select later)
+        if (this.authProvider === 'google' && value === null) {
+          return true;
+        }
+        // Otherwise, role must be a valid role
+        return Object.values(USER_ROLES).includes(value);
+      },
+      message: 'Invalid role. Must be mentor, mentee, or admin (or null for Google OAuth users)'
+    }
   },
   isActive: {
     type: Boolean,
@@ -76,6 +89,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  needsRoleSelection: {
+    type: Boolean,
+    default: false
+  },
   profile: {
     firstName: {
       type: String,
@@ -84,7 +101,8 @@ const userSchema = new mongoose.Schema({
     },
     lastName: {
       type: String,
-      required: [true, 'Last name is required'],
+      required: false,  // Not required for Google OAuth users who may only have first name
+      default: '',
       trim: true
     },
     avatar: {
@@ -131,7 +149,8 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 // Get full name
 userSchema.virtual('fullName').get(function () {
-  return `${this.profile.firstName} ${this.profile.lastName}`;
+  const lastName = this.profile.lastName || '';
+  return lastName ? `${this.profile.firstName} ${lastName}`.trim() : this.profile.firstName;
 });
 
 // Remove password from JSON output

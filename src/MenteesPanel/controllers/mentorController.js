@@ -1,4 +1,5 @@
 const MentorProfile = require('../../MentorPanel/models/MentorProfile');
+const MentorService = require('../../MentorPanel/models/Service');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 
 // Get all verified mentors (public)
@@ -77,7 +78,7 @@ const getMentorById = async (req, res) => {
 
     console.log('🔍 Fetching mentor profile for ID:', id);
 
-    const mentor = await MentorProfile.findOne({
+    let mentor = await MentorProfile.findOne({
       _id: id,
       isActive: true
     })
@@ -91,10 +92,39 @@ const getMentorById = async (req, res) => {
       return sendErrorResponse(res, 'Mentor not found', 404);
     }
 
+    const fs = require('fs');
+    fs.appendFileSync('debug.txt', `\n=== ${new Date().toISOString()} ===\n`);
+    fs.appendFileSync('debug.txt', `Mentor ID: ${id}\n`);
+    fs.appendFileSync('debug.txt', `User ID: ${mentor.userId._id}\n`);
+    fs.appendFileSync('debug.txt', `Services in profile: ${mentor.services?.length || 0}\n`);
+
+    // If services array is empty or not populated, fetch services by mentorId
+    if (!mentor.services || mentor.services.length === 0) {
+      console.log('📋 Services array empty, fetching by mentorId...');
+      fs.appendFileSync('debug.txt', `Fetching services by mentorId...\n`);
+
+      const services = await MentorService.find({
+        mentorId: mentor.userId._id,
+        isActive: true,
+        status: 'approved'
+      }).sort({ createdAt: -1 });
+
+      fs.appendFileSync('debug.txt', `Found ${services.length} services\n`);
+      services.forEach(s => fs.appendFileSync('debug.txt', `  - ${s.title}\n`));
+
+      mentor = mentor.toObject();
+      mentor.services = services;
+      console.log(`✅ Found ${services.length} services by mentorId`);
+    }
+
     console.log('✅ Mentor retrieved successfully:', mentor.userId?.profile?.firstName);
+    console.log(`📊 Services count: ${mentor.services?.length || 0}`);
+    fs.appendFileSync('debug.txt', `Final services count: ${mentor.services?.length || 0}\n`);
+
     return sendSuccessResponse(res, 'Mentor retrieved successfully', { mentor });
   } catch (error) {
     console.error('Get mentor by ID error:', error);
+    require('fs').appendFileSync('debug.txt', `ERROR: ${error.message}\n`);
     return sendErrorResponse(res, 'Failed to retrieve mentor', 500);
   }
 };

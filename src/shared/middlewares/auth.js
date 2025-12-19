@@ -6,27 +6,35 @@ const BlacklistedToken = require('../models/BlacklistedToken');
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return sendErrorResponse(res, ERROR_MESSAGES.UNAUTHORIZED, 401);
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    
+
     if (!token) {
+      console.log('❌ Auth failed: Token missing after Bearer prefix');
       return sendErrorResponse(res, ERROR_MESSAGES.UNAUTHORIZED, 401);
     }
 
     // Check if token is blacklisted
     const isBlacklisted = await BlacklistedToken.isBlacklisted(token);
     if (isBlacklisted) {
+      console.log('❌ Auth failed: Token is blacklisted');
       return sendErrorResponse(res, 'Token has been invalidated. Please login again.', 401);
     }
 
-    const decoded = verifyToken(token);
-    req.user = decoded;
-    next();
+    try {
+      const decoded = verifyToken(token);
+      req.user = decoded;
+      next();
+    } catch (jwtError) {
+      console.log('❌ Auth failed: JWT verification error:', jwtError.message);
+      return sendErrorResponse(res, ERROR_MESSAGES.INVALID_TOKEN, 401);
+    }
   } catch (error) {
+    console.log('❌ Auth failed: Unexpected error:', error.message);
     return sendErrorResponse(res, ERROR_MESSAGES.INVALID_TOKEN, 401);
   }
 };
