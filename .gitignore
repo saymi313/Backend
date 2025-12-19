@@ -24,3 +24,20 @@ database.md
 **/*Credentials.json
 **/*credentials.json
 uploads/
+
+# Temporary and utility scripts
+clean-google-users.js
+clear-user.js
+create-admin.js
+create-mentor-profile.js
+debug-env.js
+delete-all-users.js
+fix_bubbles.js
+seed-mentor-data.js
+test-email.js
+test-registration.js
+update-mentor-profile.js
+CTAButton_temp.js
+test-api.ps1
+diagnose-user-defaults.js
+diagnose-google-flow.js
