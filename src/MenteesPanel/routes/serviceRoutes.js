@@ -16,25 +16,25 @@ const {
 // Get all approved services
 router.get('/', getAllMentorServices);
 
-// Get service by ID
-router.get('/:id', getMentorServiceById);
-
-// Search services
+// Search services (must be before /:id)
 router.get('/search', searchMentorServices);
 
-// Get services by category
-router.get('/category/:category', getMentorServicesByCategory);
-
-// Get services by mentor
-router.get('/mentor/:mentorId', getMentorServicesByMentor);
-
-// Get service categories
+// Get service categories (must be before /:id)
 router.get('/meta/categories', getMentorServiceCategories);
 
-// Get featured services
+// Get featured services (must be before /:id)
 router.get('/meta/featured', getFeaturedMentorServices);
 
-// Get popular services
+// Get popular services (must be before /:id)
 router.get('/meta/popular', getPopularMentorServices);
+
+// Get services by category (must be before /:id)
+router.get('/category/:category', getMentorServicesByCategory);
+
+// Get services by mentor (must be before /:id)
+router.get('/mentor/:mentorId', getMentorServicesByMentor);
+
+// Get service by ID (must be last to avoid catching other routes)
+router.get('/:id', getMentorServiceById);
 
 module.exports = router;

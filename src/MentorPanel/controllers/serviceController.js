@@ -8,7 +8,7 @@ const createMentorService = async (req, res) => {
   try {
     const mentorId = req.user.id;
     const { title, description, category, packages, tags, location, availability } = req.body;
-    
+
     console.log('🔧 Creating mentor service:', { mentorId, title, category });
 
     // Validate required fields
@@ -18,7 +18,17 @@ const createMentorService = async (req, res) => {
 
     // Process uploaded images
     const uploadedFiles = processUploadedFiles(req, 'images');
-    const imageUrls = uploadedFiles.map(file => file.url);
+    let imageUrls = uploadedFiles.map(file => file.url);
+
+    // Get images from body (if pre-uploaded)
+    if (req.body.images) {
+      const bodyImages = typeof req.body.images === 'string'
+        ? JSON.parse(req.body.images)
+        : req.body.images;
+      if (Array.isArray(bodyImages)) {
+        imageUrls = [...bodyImages, ...imageUrls];
+      }
+    }
 
     // Create service data
     const serviceData = {
@@ -41,12 +51,12 @@ const createMentorService = async (req, res) => {
 
     return sendSuccessResponse(res, 'MentorService created successfully', { service }, 201);
   } catch (error) {
-    
+
     // Clean up uploaded files on error
     if (req.files) {
       cleanupFiles(req.files);
     }
-    
+
     return sendErrorResponse(res, error.message || 'Failed to create service', 500);
   }
 };
@@ -108,7 +118,7 @@ const updateMentorService = async (req, res) => {
     const { id } = req.params;
     const mentorId = req.user.id;
     const updateData = req.body;
-    
+
     console.log('🔧 Updating mentor service:', { id, mentorId, updateData });
     console.log('🔧 Update data types:', {
       title: typeof updateData.title,
@@ -124,12 +134,29 @@ const updateMentorService = async (req, res) => {
       return sendErrorResponse(res, 'MentorService not found', 404);
     }
 
-    // Process new uploaded images if any (only if files were uploaded)
+    // Handle images: combination of existing (if not replaced by body), body images, and new uploads
+    let finalImages = existingMentorService.images;
+
+    // If images provided in body, they become the base (this supports reordering or removing images)
+    if (updateData.images) {
+      const bodyImages = typeof updateData.images === 'string'
+        ? JSON.parse(updateData.images)
+        : updateData.images;
+      if (Array.isArray(bodyImages)) {
+        finalImages = bodyImages;
+        // Update updateData.images to the parsed array to ensure it's saved correctly
+        updateData.images = bodyImages;
+      }
+    }
+
+    // Process new uploaded images if any
     if (req.files && req.files.length > 0) {
       const uploadedFiles = processUploadedFiles(req, 'images');
       if (uploadedFiles.length > 0) {
         const newImageUrls = uploadedFiles.map(file => file.url);
-        updateData.images = [...existingMentorService.images, ...newImageUrls];
+        // Append new uploads to the final list
+        finalImages = [...finalImages, ...newImageUrls];
+        updateData.images = finalImages;
       }
     }
 
@@ -166,12 +193,12 @@ const updateMentorService = async (req, res) => {
       stack: error.stack,
       name: error.name
     });
-    
+
     // Clean up uploaded files on error
     if (req.files) {
       cleanupFiles(req.files);
     }
-    
+
     return sendErrorResponse(res, error.message || 'Failed to update service', 500);
   }
 };
@@ -200,7 +227,7 @@ const deleteMentorService = async (req, res) => {
 
     // Actually delete the service from database
     const deletedService = await MentorService.findByIdAndDelete(id);
-    
+
     if (!deletedService) {
       console.log('❌ Service not deleted from database');
       return sendErrorResponse(res, 'Failed to delete service from database', 500);
@@ -240,17 +267,17 @@ const uploadMentorServiceImages = async (req, res) => {
     service.images = [...service.images, ...imageUrls];
     await service.save();
 
-    return sendSuccessResponse(res, 'Images uploaded successfully', { 
+    return sendSuccessResponse(res, 'Images uploaded successfully', {
       images: service.images,
       newImages: imageUrls
     });
   } catch (error) {
-    
+
     // Clean up uploaded files on error
     if (req.files) {
       cleanupFiles(req.files);
     }
-    
+
     return sendErrorResponse(res, 'Failed to upload images', 500);
   }
 };
@@ -271,7 +298,7 @@ const removeMentorServiceImage = async (req, res) => {
     service.images = service.images.filter(img => img !== imageUrl);
     await service.save();
 
-    return sendSuccessResponse(res, 'Image removed successfully', { 
+    return sendSuccessResponse(res, 'Image removed successfully', {
       images: service.images
     });
   } catch (error) {
@@ -299,7 +326,7 @@ const getMentorServiceStats = async (req, res) => {
       }
     ]);
 
-    return sendSuccessResponse(res, 'MentorService statistics retrieved successfully', { 
+    return sendSuccessResponse(res, 'MentorService statistics retrieved successfully', {
       stats: stats[0] || {
         totalMentorServices: 0,
         activeMentorServices: 0,

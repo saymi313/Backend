@@ -111,35 +111,23 @@ const login = async (req, res) => {
       return sendErrorResponse(res, ERROR_MESSAGES.INVALID_CREDENTIALS, 401);
     }
 
-    console.log(`🔍 Mentor login attempt for: ${email}`);
-    console.log(`   - User ID: ${user._id}`);
-    console.log(`   - isActive: ${user.isActive}`);
-    console.log(`   - mentorApprovalStatus: ${user.mentorApprovalStatus}`);
-    console.log(`   - isLoginPaused: ${user.isLoginPaused}`);
-
     // Check if user is active
     if (!user.isActive) {
-      console.log(`   ❌ Login blocked: Account is deactivated`);
       return sendErrorResponse(res, 'Account is deactivated', 401);
     }
 
     // Check approval status (null means auto-approved for existing mentors)
     if (user.mentorApprovalStatus === 'pending') {
-      console.log(`   ❌ Login blocked: Account pending approval`);
       return sendErrorResponse(res, 'Your account is pending admin approval. Please wait for approval before logging in.', 403);
     }
     if (user.mentorApprovalStatus === 'rejected') {
-      console.log(`   ❌ Login blocked: Account rejected`);
       return sendErrorResponse(res, 'Your account has been rejected. Please contact support for more information.', 403);
     }
 
     // Check if login is paused
     if (user.isLoginPaused) {
-      console.log(`   ❌ Login blocked: Login is paused`);
       return sendErrorResponse(res, 'Your login access has been paused by admin. Please contact support for more information.', 403);
     }
-
-    console.log(`   ✅ All checks passed, proceeding with login`);
 
     // Compare password
     const isPasswordValid = await user.comparePassword(password);

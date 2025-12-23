@@ -56,7 +56,7 @@ const createMentorProfile = async (req, res) => {
     await mentorProfile.save();
 
     // Populate user data
-    await mentorProfile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+    await mentorProfile.populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email');
     await mentorProfile.populate('services');
 
     return sendSuccessResponse(res, 'Mentor profile created successfully', {
@@ -74,7 +74,7 @@ const getMentorProfile = async (req, res) => {
     console.log('📁 Getting mentor profile for user:', userId);
 
     let profile = await MentorProfile.findOne({ userId })
-      .populate('userId', 'profile.firstName profile.lastName profile.avatar email')
+      .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email')
       .populate('services')
       .populate('connections', 'profile.firstName profile.lastName profile.avatar email');
 
@@ -142,7 +142,7 @@ const updateMentorProfile = async (req, res) => {
         successStory: successStory || undefined
       });
       await profile.save();
-      await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+      await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email');
 
       return sendSuccessResponse(res, 'Mentor profile created successfully', { profile });
     }
@@ -161,7 +161,7 @@ const updateMentorProfile = async (req, res) => {
     if (successStory !== undefined) profile.successStory = successStory;
 
     await profile.save();
-    await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar email');
+    await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email');
     await profile.populate('services');
     await profile.populate('connections', 'profile.firstName profile.lastName profile.avatar email');
 

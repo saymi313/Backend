@@ -236,11 +236,15 @@ const getMentorRevenueDashboard = async (req, res) => {
 
     const recentStudentsData = recentStudents.map((student) => {
       const profile = menteeProfileMap[student._id.toString()];
+      const firstName = profile?.profile?.firstName || '';
+      const lastName = profile?.profile?.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'Student';
+
       return {
         menteeId: student._id,
-        name: profile?.name || 'Student',
-        country: profile?.country || 'Unknown',
-        avatar: profile?.avatar || '',
+        name: fullName,
+        country: profile?.profile?.country || 'Unknown',
+        avatar: profile?.profile?.avatar || '',
         lastPaymentAt: student.lastPaymentAt,
       };
     });

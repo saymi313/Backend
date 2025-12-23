@@ -1,4 +1,5 @@
 const MentorService = require('../../MentorPanel/models/Service');
+const MentorProfile = require('../../MentorPanel/models/MentorProfile');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 
 const parseTagFilters = (value) => {
@@ -55,13 +56,13 @@ const buildTagFilter = (educationLevel, tags) => {
 // Get all approved services
 const getAllMentorServices = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 12, 
-      category, 
-      minPrice, 
-      maxPrice, 
-      rating, 
+    const {
+      page = 1,
+      limit = 12,
+      category,
+      minPrice,
+      maxPrice,
+      rating,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       educationLevel,
@@ -132,10 +133,10 @@ const getMentorServiceById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const service = await MentorService.findOne({ 
-      _id: id, 
-      status: 'approved', 
-      isActive: true 
+    const service = await MentorService.findOne({
+      _id: id,
+      status: 'approved',
+      isActive: true
     }).populate('mentorId', 'profile firstName lastName');
 
     if (!service) {
@@ -144,17 +145,21 @@ const getMentorServiceById = async (req, res) => {
 
     // Get feedback count for the service
     const ServiceFeedback = require('../../shared/models/ServiceFeedback');
-    const feedbackCount = await ServiceFeedback.countDocuments({ 
-      serviceId: id, 
-      isActive: true 
+    const feedbackCount = await ServiceFeedback.countDocuments({
+      serviceId: id,
+      isActive: true
     });
 
-    // Convert service to object and add feedback count
+    // Get MentorProfile ID for navigation
+    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id');
+
+    // Convert service to object and add feedback count and mentorProfileId
     const serviceObject = service.toObject();
     serviceObject.feedbackCount = feedbackCount;
+    serviceObject.mentorProfileId = mentorProfile ? mentorProfile._id : null;
 
-    return sendSuccessResponse(res, 'MentorService retrieved successfully', { 
-      service: serviceObject 
+    return sendSuccessResponse(res, 'MentorService retrieved successfully', {
+      service: serviceObject
     });
   } catch (error) {
     console.error('Error getting service by ID:', error);
@@ -165,16 +170,16 @@ const getMentorServiceById = async (req, res) => {
 // Search services
 const searchMentorServices = async (req, res) => {
   try {
-    const { 
-      q, 
-      category, 
-      minPrice, 
-      maxPrice, 
-      rating, 
+    const {
+      q,
+      category,
+      minPrice,
+      maxPrice,
+      rating,
       location,
       educationLevel,
       tags,
-      page = 1, 
+      page = 1,
       limit = 12,
       sortBy = 'relevance',
       sortOrder = 'desc'

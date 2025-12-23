@@ -1,45 +1,36 @@
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const path = require('path');
-const fs = require('fs');
 
-// Ensure upload directories exist
-const uploadDirs = [
-  'uploads',
-  'uploads/services',
-  'uploads/services/images',
-  'uploads/avatars',
-  'uploads/documents'
-];
-
-uploadDirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+// Cloudinary configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 // Storage configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    let uploadPath = 'uploads/services/images';
-    
-    // Different paths for different file types
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    let folder = 'scholarslee/others';
+
+    // Determine folder based on field name
     if (file.fieldname === 'avatar') {
-      uploadPath = 'uploads/avatars';
-    } else if (file.fieldname === 'document') {
-      uploadPath = 'uploads/documents';
+      folder = 'scholarslee/avatars';
+    } else if (file.fieldname === 'images') {
+      folder = 'scholarslee/services';
+    } else if (file.fieldname === 'documents' || file.fieldname === 'document') {
+      folder = 'scholarslee/documents';
     }
-    
-    cb(null, uploadPath);
+
+    return {
+      folder: folder,
+      resource_type: 'auto', // Auto-detect image or raw file (for docs)
+      public_id: path.parse(file.originalname).name.replace(/\s+/g, '-') + '-' + Date.now(),
+    };
   },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    const name = path.basename(file.originalname, ext);
-    const filename = `${name}-${uniqueSuffix}${ext}`;
-    
-    cb(null, filename);
-  }
 });
 
 // File filter for images
@@ -59,7 +50,7 @@ const documentFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain'
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -122,21 +113,29 @@ const handleUploadError = (error, req, res, next) => {
       });
     }
   }
-  
+
   if (error.message.includes('Only image files are allowed')) {
     return res.status(400).json({
       success: false,
       message: 'Only image files are allowed for this upload.'
     });
   }
-  
+
   if (error.message.includes('Only PDF, DOC, DOCX, and TXT files are allowed')) {
     return res.status(400).json({
       success: false,
       message: 'Only PDF, DOC, DOCX, and TXT files are allowed for documents.'
     });
   }
-  
+
+  // Cloudinary errors
+  if (error.http_code) {
+    return res.status(error.http_code).json({
+      success: false,
+      message: error.message || 'Cloudinary upload error'
+    });
+  }
+
   next(error);
 };
 

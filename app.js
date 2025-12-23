@@ -99,6 +99,7 @@ app.use('/api/contact', require('./src/MenteesPanel/routes/contactRoutes'));
 // Mentor Panel Routes  
 console.log('🔧 Loading mentor routes...');
 app.use('/api/mentors/auth', require('./src/MentorPanel/routes/authRoutes'));
+app.use('/api/mentors/dashboard', require('./src/MentorPanel/routes/dashboardRoutes'));
 app.use('/api/mentors/services', require('./src/MentorPanel/routes/serviceRoutes'));
 app.use('/api/mentors/profile', require('./src/MentorPanel/routes/profileRoutes'));
 app.use('/api/mentors', require('./src/MentorPanel/routes/bookingRoutes'));

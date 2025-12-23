@@ -129,11 +129,17 @@ This is an automated message. Please do not reply to this email.
  * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
  */
 const sendOTPEmail = async (email, otp) => {
+  const timestamp = new Date().toISOString();
+  console.log('\n🔵 ===== EMAIL SERVICE: Password Reset OTP =====');
+  console.log('🕐 Timestamp:', timestamp);
+  console.log('📧 Recipient:', email);
+  console.log('🔐 OTP:', otp);
+
   try {
     const transporter = createTransporter();
 
     if (!transporter) {
-      console.error('Email transporter not configured');
+      console.error('❌ Email transporter not configured');
       return {
         success: false,
         error: 'Email service not configured'
@@ -148,18 +154,40 @@ const sendOTPEmail = async (email, otp) => {
       html: getOTPEmailTemplate(otp)
     };
 
+    console.log('📤 Sending password reset OTP...');
+    const sendStartTime = Date.now();
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email sent to ${email}: ${info.messageId}`);
+    const sendDuration = ((Date.now() - sendStartTime) / 1000).toFixed(2);
+
+    console.log(`✅ OTP email sent successfully in ${sendDuration}s`);
+    console.log('📬 Message ID:', info.messageId);
+    console.log('📨 SMTP Response:', info.response);
+
+    if (info.accepted && info.accepted.length > 0) {
+      console.log('✅ Accepted by server:', info.accepted.join(', '));
+    }
+    if (info.rejected && info.rejected.length > 0) {
+      console.log('⚠️  Rejected by server:', info.rejected.join(', '));
+    }
+    console.log('🔵 ===== EMAIL SERVICE: Complete =====\n');
 
     return {
       success: true,
-      messageId: info.messageId
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected
     };
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
+    console.error('❌ Error sending OTP email:', error.message);
+    console.error('📋 Error Details:');
+    console.error('   Code:', error.code);
+    console.error('   Command:', error.command);
+    console.error('🔵 ===== EMAIL SERVICE: Failed =====\n');
+
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      errorCode: error.code
     };
   }
 };
@@ -412,7 +440,9 @@ The Scholarslee Team
  * @param {string} otp - OTP code
  */
 const sendVerificationEmail = async (email, otp) => {
+  const timestamp = new Date().toISOString();
   console.log('\n🔵 ===== EMAIL SERVICE: Starting Verification Email =====');
+  console.log('🕐 Timestamp:', timestamp);
   console.log('📧 Recipient:', email);
   console.log('🔐 OTP:', otp);
 
@@ -448,13 +478,44 @@ const sendVerificationEmail = async (email, otp) => {
     const sendDuration = ((Date.now() - sendStartTime) / 1000).toFixed(2);
     console.log(`✅ EMAIL SENT SUCCESSFULLY in ${sendDuration}s`);
     console.log('📬 Message ID:', info.messageId);
-    console.log('📨 Response:', info.response);
+    console.log('📨 SMTP Response:', info.response);
+
+    // Log acceptance details
+    if (info.accepted && info.accepted.length > 0) {
+      console.log('✅ Accepted by server:', info.accepted.join(', '));
+    }
+    if (info.rejected && info.rejected.length > 0) {
+      console.log('⚠️  Rejected by server:', info.rejected.join(', '));
+    }
+    if (info.pending && info.pending.length > 0) {
+      console.log('⏳ Pending:', info.pending.join(', '));
+    }
+
     console.log('🔵 ===== EMAIL SERVICE: Complete =====\n');
 
-    return { success: true, messageId: info.messageId };
+    return {
+      success: true,
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response
+    };
   } catch (error) {
-    console.error('❌ Error sending Verification email:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Error sending Verification email:', error.message);
+    console.error('📋 Error Details:');
+    console.error('   Code:', error.code);
+    console.error('   Command:', error.command);
+    if (error.responseCode) {
+      console.error('   Response Code:', error.responseCode);
+    }
+    console.error('🔵 ===== EMAIL SERVICE: Failed =====\n');
+
+    return {
+      success: false,
+      error: error.message,
+      errorCode: error.code,
+      errorCommand: error.command
+    };
   }
 };
 
