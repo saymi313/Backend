@@ -1,14 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-// Only use file if explicitly set via env var, otherwise use env vars only
-const CREDENTIAL_FILENAME = process.env.GOOGLE_MEET_CREDENTIAL_FILE || null;
+// Only use file if explicitly set via env var, otherwise default to local file for dev convenience
+const CREDENTIAL_FILENAME = process.env.GOOGLE_MEET_CREDENTIAL_FILE || path.join(process.cwd(), 'google-credentials.json');
 
 let cachedCredentials = null;
 
 const readCredentialFile = () => {
+  console.log('Reading credential file from:', CREDENTIAL_FILENAME);
   // If no file path is set, skip file reading
   if (!CREDENTIAL_FILENAME || !fs.existsSync(CREDENTIAL_FILENAME)) {
+    console.log('Credential file not found or path not set.');
     return null;
   }
 
@@ -19,6 +21,7 @@ const readCredentialFile = () => {
     }
 
     const parsed = JSON.parse(raw);
+    console.log('Successfully read credential file.');
     return parsed;
   } catch (error) {
     console.error('Failed to read Google Meet credential file:', error);
@@ -102,6 +105,7 @@ const persistTokens = (tokens = {}) => {
     }
 
     // If credential file is configured, write to it
+    console.log('Attempting to persist tokens to:', CREDENTIAL_FILENAME);
     const fileCredentials = readCredentialFile() || {};
     const containerKey = fileCredentials.web ? 'web' : (fileCredentials.installed ? 'installed' : null);
 
@@ -123,6 +127,7 @@ const persistTokens = (tokens = {}) => {
     }
 
     fs.writeFileSync(CREDENTIAL_FILENAME, JSON.stringify(fileCredentials, null, 2), 'utf-8');
+    console.log('Successfully wrote tokens to credential file.');
 
     // Reset cache so the next read picks up new tokens
     cachedCredentials = null;

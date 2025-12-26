@@ -98,7 +98,7 @@ const createMeeting = async (req, res) => {
     // Validate time format
     const start = new Date(startTime);
     const end = new Date(endTime);
-    
+
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       return sendErrorResponse(res, 'Invalid date format', 400);
     }
@@ -117,7 +117,7 @@ const createMeeting = async (req, res) => {
     };
 
     const result = await googleMeetService.createMeeting(meetingDetails);
-    
+
     if (result.success) {
       const mentorId = req.user.id;
       const duration = Math.round((end - start) / (1000 * 60)); // Duration in minutes
@@ -244,7 +244,7 @@ const updateMeeting = async (req, res) => {
     };
 
     const result = await googleMeetService.updateMeeting(eventId, meetingDetails);
-    
+
     if (result.success) {
       return sendSuccessResponse(res, 'Google Meet meeting updated successfully', {
         meetingLink: result.meetingLink,
@@ -282,7 +282,7 @@ const deleteMeeting = async (req, res) => {
     }
 
     const result = await googleMeetService.deleteMeeting(eventId);
-    
+
     if (result.success) {
       return sendSuccessResponse(res, 'Google Meet meeting deleted successfully');
     } else {
@@ -316,7 +316,7 @@ const getMeeting = async (req, res) => {
     }
 
     const result = await googleMeetService.getMeeting(eventId);
-    
+
     if (result.success) {
       return sendSuccessResponse(res, 'Meeting details retrieved successfully', {
         meeting: result.meeting,
@@ -359,6 +359,7 @@ const getAuthUrl = async (req, res) => {
 const getTokens = async (req, res) => {
   try {
     const { code } = req.body;
+    console.log('🔹 getTokens endpoint hit. Code received:', code ? code.substring(0, 5) + '...' : 'MISSING');
 
     if (!code) {
       return sendErrorResponse(res, 'Authorization code is required', 400);
@@ -398,6 +399,88 @@ const getTokens = async (req, res) => {
   }
 };
 
+const mongoose = require('mongoose');
+
+// Get meetings by date range (for calendar)
+const getMeetingsByDateRange = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    // Cast mentorId to ObjectId to ensure matching if schema uses ObjectId
+    const mentorId = new mongoose.Types.ObjectId(req.user.id);
+
+    console.log(`📅 getMeetingsByDateRange hit. Mentor: ${mentorId} (ObjectId), Range: ${startDate} to ${endDate}`);
+
+    if (!startDate || !endDate) {
+      return sendErrorResponse(res, 'Start date and end date are required', 400);
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const meetings = await Meeting.find({
+      mentorId,
+      scheduledDate: { $gte: start, $lte: end },
+      status: { $ne: 'cancelled' } // Optional: exclude cancelled
+    }).sort({ scheduledDate: 1 });
+
+    console.log(`✅ Found ${meetings.length} meetings for range.`);
+
+    // Group by date for calendar widget if needed
+    const meetingsByDate = {};
+    meetings.forEach(meeting => {
+      const dateKey = new Date(meeting.scheduledDate).toISOString().split('T')[0];
+      if (!meetingsByDate[dateKey]) {
+        meetingsByDate[dateKey] = [];
+      }
+      meetingsByDate[dateKey].push(meeting);
+    });
+
+    return sendSuccessResponse(res, 'Meetings retrieved successfully', {
+      meetings,
+      meetingsByDate
+    });
+  } catch (error) {
+    console.error('Error fetching meetings by range:', error);
+    return sendErrorResponse(res, 'Failed to fetch meetings', 500);
+  }
+};
+
+// Get meetings for specific date
+const getMeetingsByDate = async (req, res) => {
+  try {
+    const { date } = req.params;
+    const mentorId = new mongoose.Types.ObjectId(req.user.id);
+
+    console.log(`📅 getMeetingsByDate hit. Mentor: ${mentorId} (ObjectId), Date: ${date}`);
+
+    if (!date) {
+      return sendErrorResponse(res, 'Date is required', 400);
+    }
+
+    // Create start and end of day in UTC (or local if handled carefully, but safely assuming ISO date string)
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const meetings = await Meeting.find({
+      mentorId,
+      scheduledDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'cancelled' }
+    }).sort({ scheduledDate: 1 });
+
+    console.log(`✅ Found ${meetings.length} meetings for date.`);
+
+    return sendSuccessResponse(res, 'Meetings retrieved successfully', {
+      meetings
+    });
+  } catch (error) {
+    console.error('Error fetching meetings by date:', error);
+    return sendErrorResponse(res, 'Failed to fetch meetings', 500);
+  }
+};
+
 module.exports = {
   initializeGoogleClient,
   createMeeting,
@@ -405,5 +488,7 @@ module.exports = {
   deleteMeeting,
   getMeeting,
   getAuthUrl,
-  getTokens
+  getTokens,
+  getMeetingsByDateRange,
+  getMeetingsByDate
 };

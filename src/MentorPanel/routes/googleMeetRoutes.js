@@ -9,7 +9,9 @@ const {
   deleteMeeting,
   getMeeting,
   getAuthUrl,
-  getTokens
+  getTokens,
+  getMeetingsByDateRange,
+  getMeetingsByDate
 } = require('../controllers/googleMeetController');
 
 // Apply authentication middleware to all routes
@@ -25,5 +27,7 @@ router.post('/meetings', createMeeting);
 router.get('/meetings/:eventId', getMeeting);
 router.put('/meetings/:eventId', updateMeeting);
 router.delete('/meetings/:eventId', deleteMeeting);
+router.get('/calendar', getMeetingsByDateRange);
+router.get('/date/:date', getMeetingsByDate);
 
 module.exports = router;
