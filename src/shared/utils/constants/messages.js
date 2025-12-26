@@ -6,7 +6,7 @@ const SUCCESS_MESSAGES = {
 };
 
 const ERROR_MESSAGES = {
-  INVALID_CREDENTIALS: 'Invalid email or password',
+  INVALID_CREDENTIALS: 'Invalid email or password (SERVER)',
   USER_NOT_FOUND: 'User not found',
   USER_ALREADY_EXISTS: 'User already exists with this email',
   UNAUTHORIZED: 'Unauthorized access',

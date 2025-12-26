@@ -129,18 +129,23 @@ const login = async (req, res) => {
     const email = req.body.email.toLowerCase();
 
     // Find user and include password for comparison
+    console.log('🔍 Login attempt for:', email);
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('❌ User not found:', email);
       return sendErrorResponse(res, ERROR_MESSAGES.INVALID_CREDENTIALS, 401);
     }
+    console.log('✅ User found:', user._id, 'Role:', user.role);
 
     // Check if user is active
     if (!user.isActive) {
+      console.log('❌ User account is deactivated');
       return sendErrorResponse(res, 'Account is deactivated', 401);
     }
 
     // Check if user is verified (only for local auth)
     if (user.authProvider === 'local' && !user.isVerified) {
+      console.log('❌ User email not verified');
       return sendErrorResponse(res, 'Please verify your email address before logging in', 403, {
         isVerified: false,
         email: user.email
@@ -150,8 +155,10 @@ const login = async (req, res) => {
     // Compare password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
+      console.log('❌ Invalid password for:', email);
       return sendErrorResponse(res, ERROR_MESSAGES.INVALID_CREDENTIALS, 401);
     }
+    console.log('✅ Password valid');
 
     // Generate JWT token
     const token = generateToken({

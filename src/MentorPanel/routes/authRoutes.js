@@ -16,7 +16,7 @@ const router = express.Router();
 const registerValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
+    .isEmail()
     .withMessage('Please provide a valid email'),
   body('password')
     .isLength({ min: 6 })
@@ -34,7 +34,7 @@ const registerValidation = [
 const loginValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
+    .isEmail()
     .withMessage('Please provide a valid email'),
   body('password')
     .notEmpty()
