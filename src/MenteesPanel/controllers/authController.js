@@ -18,7 +18,8 @@ const register = async (req, res) => {
       return sendValidationError(res, errors.array());
     }
 
-    const { email, password, role, firstName, lastName } = req.body;
+    const { password, role, firstName, lastName } = req.body;
+    const email = req.body.email.toLowerCase();
 
     // Check if user already exists in User collection
     const existingUser = await User.findOne({ email });
@@ -124,7 +125,8 @@ const login = async (req, res) => {
       return sendValidationError(res, errors.array());
     }
 
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = req.body.email.toLowerCase();
 
     // Find user and include password for comparison
     const user = await User.findOne({ email }).select('+password');
