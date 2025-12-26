@@ -8,6 +8,10 @@ const PORT = process.env.PORT || 5000;
 // Start server first
 const server = app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log('--- ENV CONFIG WAITING ---');
+  console.log('MONGODB_URI:', process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 25) + '...' : 'UNDEFINED');
+  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+  console.log('---------------------------');
   console.log(`Health check: http://localhost:${PORT}/health`);
 });
 
