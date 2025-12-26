@@ -11,14 +11,15 @@ const connectDB = async () => {
 
     console.log('Attempting to connect to MongoDB...');
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      serverSelectionTimeoutMS: 5000,
+      dbName: 'scholarslee_db'
     });
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     console.log(`Database: ${conn.connection.name}`);
   } catch (error) {
     console.error('❌ Database connection error:', error.message);
-    
+
     if (error.message.includes('authentication failed')) {
       console.error('🔐 Authentication failed. Please check:');
       console.error('   - Username and password in connection string');
@@ -30,7 +31,7 @@ const connectDB = async () => {
       console.error('   - MongoDB Atlas cluster status');
       console.error('   - Connection string format');
     }
-    
+
     console.error('⚠️  Server will run but database operations will fail');
     console.error('💡 For development, you can use MongoDB Compass or a local MongoDB instance');
   }
