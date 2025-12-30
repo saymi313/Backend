@@ -73,6 +73,12 @@ const mentorProfileSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Title cannot exceed 100 characters']
   },
+  slug: {
+    type: String,
+    unique: true,
+    trim: true,
+    sparse: true // Allows null/undefined for existing records until migration
+  },
   bio: {
     type: String,
     required: [true, 'Bio is required'],

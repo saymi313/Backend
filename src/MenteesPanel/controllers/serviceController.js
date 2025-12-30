@@ -1,6 +1,7 @@
 const MentorService = require('../../MentorPanel/models/Service');
 const MentorProfile = require('../../MentorPanel/models/MentorProfile');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
+const { sanitizeSlug, sanitizeObjectId } = require('../../shared/utils/helpers/sanitization');
 
 const parseTagFilters = (value) => {
   if (!value) {
@@ -109,6 +110,7 @@ const getAllMentorServices = async (req, res) => {
 
     const services = await MentorService.find(query)
       .populate('mentorId', 'profile firstName lastName')
+      .populate('mentorProfile', 'slug')
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -238,6 +240,7 @@ const searchMentorServices = async (req, res) => {
 
     const services = await MentorService.find(searchQuery)
       .populate('mentorId', 'profile firstName lastName')
+      .populate('mentorProfile', 'slug') // Get slug
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -369,6 +372,7 @@ const getFeaturedMentorServices = async (req, res) => {
       rating: { $gte: 4.0 }
     })
       .populate('mentorId', 'profile firstName lastName')
+      .populate('mentorProfile', 'slug')
       .sort({ rating: -1, totalReviews: -1 })
       .limit(parseInt(limit));
 
@@ -388,12 +392,73 @@ const getPopularMentorServices = async (req, res) => {
       isActive: true
     })
       .populate('mentorId', 'profile firstName lastName')
+      .populate('mentorProfile', 'slug')
       .sort({ totalReviews: -1, rating: -1 })
       .limit(parseInt(limit));
 
     return sendSuccessResponse(res, 'Popular services retrieved successfully', { services });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to retrieve popular services', 500);
+  }
+};
+
+// Get service by Mentor Slug and Service Slug
+const getServiceByMentorAndSlug = async (req, res) => {
+  try {
+    const { mentorSlug, serviceSlug } = req.params;
+    console.log(`🔍 Fetching service: ${serviceSlug} for mentor: ${mentorSlug}`);
+
+    // Sanitize slug inputs to prevent injection
+    const sanitizedMentorSlug = sanitizeSlug(mentorSlug);
+    const sanitizedServiceSlug = sanitizeSlug(serviceSlug);
+
+    // 1. Find Mentor by Slug
+    const mentor = await MentorProfile.findOne({ slug: sanitizedMentorSlug }).select('userId');
+    if (!mentor) {
+      console.log('❌ Mentor not found for slug:', sanitizedMentorSlug);
+      return sendErrorResponse(res, 'Mentor not found', 404);
+    }
+
+    // 2. Find Service by Slug and Mentor ID
+    const service = await MentorService.findOne({
+      slug: sanitizedServiceSlug,
+      mentorId: mentor.userId,
+      status: 'approved',
+      isActive: true
+    }).populate('mentorId', 'profile firstName lastName');
+
+    if (!service) {
+      console.log('❌ Service not found:', serviceSlug);
+      return sendErrorResponse(res, 'Service not found', 404);
+    }
+
+    // Get feedback count
+    const ServiceFeedback = require('../../shared/models/ServiceFeedback');
+    const feedbackCount = await ServiceFeedback.countDocuments({
+      serviceId: service._id,
+      isActive: true
+    });
+
+    // Get MentorProfile ID for navigation
+    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id slug');
+
+    const serviceObject = service.toObject();
+    serviceObject.feedbackCount = feedbackCount;
+    serviceObject.mentorProfileId = mentorProfile ? mentorProfile._id : null;
+    serviceObject.mentorSlug = mentorProfile ? mentorProfile.slug : null;
+
+    return sendSuccessResponse(res, 'Service retrieved successfully', {
+      service: serviceObject
+    });
+  } catch (error) {
+    console.error('Error getting service by slugs:', error);
+
+    // Handle validation errors with 400 Bad Request
+    if (error.message && error.message.startsWith('Invalid')) {
+      return sendErrorResponse(res, error.message, 400);
+    }
+
+    return sendErrorResponse(res, 'Failed to retrieve service', 500);
   }
 };
 
@@ -405,5 +470,6 @@ module.exports = {
   getMentorServicesByMentor,
   getMentorServiceCategories,
   getFeaturedMentorServices,
-  getPopularMentorServices
+  getPopularMentorServices,
+  getServiceByMentorAndSlug
 };

@@ -1,6 +1,8 @@
+const mongoose = require('mongoose');
 const MentorProfile = require('../../MentorPanel/models/MentorProfile');
 const MentorService = require('../../MentorPanel/models/Service');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
+const { sanitizeSlug, sanitizeObjectId, sanitizeSearchQuery } = require('../../shared/utils/helpers/sanitization');
 
 // Get all verified mentors (public)
 const getAllMentors = async (req, res) => {
@@ -42,7 +44,7 @@ const getAllMentors = async (req, res) => {
 
     const mentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('title rating totalReviews userId')
+      .select('title rating totalReviews userId slug')
       .lean() // Convert to plain JS objects for better performance
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
@@ -76,12 +78,18 @@ const getMentorById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log('🔍 Fetching mentor profile for ID:', id);
+    console.log('🔍 Fetching mentor profile for:', id);
 
-    let mentor = await MentorProfile.findOne({
-      _id: id,
-      isActive: true
-    })
+    let query = { isActive: true };
+
+    // Check if id is a valid ObjectId
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id); if (isValidObjectId) {
+      query._id = id;
+    } else {
+      query.slug = id;
+    }
+
+    let mentor = await MentorProfile.findOne(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email')
       .populate('connections', 'profile.firstName profile.lastName profile.avatar email')
       .populate('services')
@@ -92,30 +100,47 @@ const getMentorById = async (req, res) => {
       return sendErrorResponse(res, 'Mentor not found', 404);
     }
 
-    const fs = require('fs');
-    fs.appendFileSync('debug.txt', `\n=== ${new Date().toISOString()} ===\n`);
-    fs.appendFileSync('debug.txt', `Mentor ID: ${id}\n`);
-    fs.appendFileSync('debug.txt', `User ID: ${mentor.userId._id}\n`);
-    fs.appendFileSync('debug.txt', `Services in profile: ${mentor.services?.length || 0}\n`);
-
-    // If services array is empty or not populated, fetch services by mentorId
-    if (!mentor.services || mentor.services.length === 0) {
-      console.log('📋 Services array empty, fetching by mentorId...');
-      fs.appendFileSync('debug.txt', `Fetching services by mentorId...\n`);
-
-      const services = await MentorService.find({
-        mentorId: mentor.userId._id,
-        isActive: true,
-        status: 'approved'
-      }).sort({ createdAt: -1 });
-
-      fs.appendFileSync('debug.txt', `Found ${services.length} services\n`);
-      services.forEach(s => fs.appendFileSync('debug.txt', `  - ${s.title}\n`));
-
-      mentor = mentor.toObject();
-      mentor.services = services;
-      console.log(`✅ Found ${services.length} services by mentorId`);
+    // Safety check for userId
+    if (!mentor.userId) {
+      console.error('❌ Mentor found but userId is missing/null:', mentor._id);
+      return sendErrorResponse(res, 'Mentor user data not found', 404);
     }
+
+    const fs = require('fs');
+    try {
+      // debug logging (optional, wrap in try-catch to avoid crashing if FS fails)
+      // fs.appendFileSync('debug.txt', `\n=== ${new Date().toISOString()} ===\n`);
+      // fs.appendFileSync('debug.txt', `Mentor ID: ${id}\n`);
+      // fs.appendFileSync('debug.txt', `User ID: ${mentor.userId._id}\n`);
+    } catch (e) { }
+
+    // Always fetch fresh services by mentorId to ensure data consistency
+    console.log('📋 Fetching fresh services by mentorId...');
+
+    const services = await MentorService.find({
+      mentorId: mentor.userId._id,
+      isActive: true,
+      status: 'approved'
+    }).sort({ createdAt: -1 });
+
+    // Check for services potentially linked to Profile ID instead of User ID
+    const servicesByProfileId = await MentorService.countDocuments({
+      mentorId: mentor._id,
+      isActive: true,
+      status: 'approved'
+    });
+    console.log(`🔍 Check: Found ${servicesByProfileId} services linked to ProfileID instead of UserID`);
+    fs.appendFileSync('debug.txt', `Check: Found ${servicesByProfileId} services linked to ProfileID instead of UserID\n`);
+
+    fs.appendFileSync('debug.txt', `Found ${services.length} services\n`);
+    services.forEach(s => fs.appendFileSync('debug.txt', `  - ${s.title}\n`));
+
+    // Convert to object if it's a mongoose document (though it should be already if populated)
+    if (mentor.toObject) {
+      mentor = mentor.toObject();
+    }
+    mentor.services = services;
+    console.log(`✅ Attached ${services.length} fresh services to response`);
 
     console.log('✅ Mentor retrieved successfully:', mentor.userId?.profile?.firstName);
     console.log(`📊 Services count: ${mentor.services?.length || 0}`);
@@ -124,7 +149,9 @@ const getMentorById = async (req, res) => {
     return sendSuccessResponse(res, 'Mentor retrieved successfully', { mentor });
   } catch (error) {
     console.error('Get mentor by ID error:', error);
-    require('fs').appendFileSync('debug.txt', `ERROR: ${error.message}\n`);
+    try {
+      require('fs').appendFileSync('debug.txt', `ERROR: ${error.message}\n`);
+    } catch (e) { console.error('Error writing to debug file', e); }
     return sendErrorResponse(res, 'Failed to retrieve mentor', 500);
   }
 };
@@ -170,7 +197,7 @@ const searchMentors = async (req, res) => {
 
     const mentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('-verificationDocuments')
+      .select('-verificationDocuments slug')
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -260,7 +287,7 @@ const getFeaturedMentors = async (req, res) => {
       totalReviews: { $gte: 5 }
     })
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('-verificationDocuments')
+      .select('-verificationDocuments slug')
       .sort({ rating: -1, totalReviews: -1 })
       .limit(parseInt(limit));
 
@@ -279,3 +306,5 @@ module.exports = {
   getMentorSpecializations,
   getFeaturedMentors
 };
+
+

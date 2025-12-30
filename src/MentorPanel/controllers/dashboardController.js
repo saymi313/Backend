@@ -97,18 +97,27 @@ const getUpcomingSessions = async (req, res) => {
         const User = require('../../shared/models/User');
 
         const now = new Date();
+        console.log(`📅 Fetching upcoming sessions for Mentor: ${mentorId}`);
+        console.log(`🕒 Current Server Time: ${now.toISOString()}`);
 
         // Get upcoming meetings (next 7 days)
         const upcomingMeetings = await Meeting.find({
             mentorId: mentorObjectId,
-            status: { $in: ['scheduled', 'confirmed'] },
-            scheduledAt: { $gte: now }
+            status: { $in: ['scheduled', 'in-progress'] },
+            scheduledDate: { $gte: now }
         })
-            .sort({ scheduledAt: 1 })
+            .sort({ scheduledDate: 1 })
             .limit(5)
             .populate('menteeId', 'profile.firstName profile.lastName profile.country')
             .populate('serviceId', 'title')
             .lean();
+
+        console.log(`✅ Found ${upcomingMeetings.length} upcoming meetings`);
+        if (upcomingMeetings.length === 0) {
+            // Check if there are ANY meetings for this mentor, ignoring date/status
+            const allMeetings = await Meeting.countDocuments({ mentorId: mentorObjectId });
+            console.log(`ℹ️  Total meetings in DB for this mentor (any status/time): ${allMeetings}`);
+        }
 
         const sessions = upcomingMeetings.map(meeting => {
             const mentee = meeting.menteeId;
@@ -116,7 +125,7 @@ const getUpcomingSessions = async (req, res) => {
             const lastName = mentee?.profile?.lastName || '';
             const studentName = `${firstName} ${lastName}`.trim() || 'Unknown Student';
 
-            const scheduledDate = new Date(meeting.scheduledAt);
+            const scheduledDate = new Date(meeting.scheduledDate);
             const date = scheduledDate.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -134,7 +143,7 @@ const getUpcomingSessions = async (req, res) => {
                 date: date,
                 time: time,
                 country: mentee?.profile?.country || 'Unknown',
-                scheduledAt: meeting.scheduledAt
+                scheduledAt: meeting.scheduledDate
             };
         });
 

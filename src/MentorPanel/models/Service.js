@@ -39,6 +39,11 @@ const serviceSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Title cannot exceed 100 characters']
   },
+  slug: {
+    type: String,
+    trim: true,
+    sparse: true // Allows null/undefined until migration
+  },
   description: {
     type: String,
     required: [true, 'Service description is required'],
@@ -129,8 +134,16 @@ serviceSchema.index({ createdAt: -1 });
 serviceSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
 // Virtual for average rating
-serviceSchema.virtual('averageRating').get(function() {
+serviceSchema.virtual('averageRating').get(function () {
   return this.totalReviews > 0 ? (this.rating / this.totalReviews).toFixed(1) : 0;
+});
+
+// Virtual populate for MentorProfile (to get slug)
+serviceSchema.virtual('mentorProfile', {
+  ref: 'MentorProfile',
+  localField: 'mentorId',
+  foreignField: 'userId', // MentorProfile.userId matches Service.mentorId
+  justOne: true
 });
 
 // Ensure virtual fields are serialized
@@ -138,33 +151,33 @@ serviceSchema.set('toJSON', { virtuals: true });
 serviceSchema.set('toObject', { virtuals: true });
 
 // Pre-save middleware to validate packages
-serviceSchema.pre('save', function(next) {
+serviceSchema.pre('save', function (next) {
   if (this.packages.length === 0) {
     return next(new Error('At least one package is required'));
   }
-  
+
   // Ensure package names are unique within the service
   const packageNames = this.packages.map(pkg => pkg.name.toLowerCase());
   const uniqueNames = new Set(packageNames);
-  
+
   if (packageNames.length !== uniqueNames.size) {
     return next(new Error('Package names must be unique within a service'));
   }
-  
+
   next();
 });
 
 // Static method to get services by category
-serviceSchema.statics.getByCategory = function(category) {
-  return this.find({ 
-    category, 
-    status: 'approved', 
-    isActive: true 
+serviceSchema.statics.getByCategory = function (category) {
+  return this.find({
+    category,
+    status: 'approved',
+    isActive: true
   }).populate('mentorId', 'profile firstName lastName');
 };
 
 // Static method to search services
-serviceSchema.statics.searchServices = function(query, filters = {}) {
+serviceSchema.statics.searchServices = function (query, filters = {}) {
   const searchQuery = {
     status: 'approved',
     isActive: true,
@@ -181,7 +194,7 @@ serviceSchema.statics.searchServices = function(query, filters = {}) {
 };
 
 // Instance method to update rating
-serviceSchema.methods.updateRating = function(newRating) {
+serviceSchema.methods.updateRating = function (newRating) {
   const totalRating = (this.rating * this.totalReviews) + newRating;
   this.totalReviews += 1;
   this.rating = totalRating / this.totalReviews;
@@ -189,7 +202,7 @@ serviceSchema.methods.updateRating = function(newRating) {
 };
 
 // Instance method to recalculate rating from feedbacks
-serviceSchema.methods.recalculateRating = async function() {
+serviceSchema.methods.recalculateRating = async function () {
   const ServiceFeedback = require('../../shared/models/ServiceFeedback');
   const ratingData = await ServiceFeedback.calculateAverageRating(this._id);
   this.rating = ratingData.rating;

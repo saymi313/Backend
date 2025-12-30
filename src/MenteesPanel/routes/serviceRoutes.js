@@ -34,6 +34,9 @@ router.get('/category/:category', getMentorServicesByCategory);
 // Get services by mentor (must be before /:id)
 router.get('/mentor/:mentorId', getMentorServicesByMentor);
 
+// Get service by Mentor & Service Slug (NEW)
+router.get('/details/:mentorSlug/:serviceSlug', require('../controllers/serviceController').getServiceByMentorAndSlug);
+
 // Get service by ID (must be last to avoid catching other routes)
 router.get('/:id', getMentorServiceById);
 
