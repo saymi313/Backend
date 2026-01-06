@@ -38,8 +38,8 @@ const getTransporter = () => {
     connectionTimeout: 30000, // 30 seconds
     greetingTimeout: 30000,   // 30 seconds
     socketTimeout: 45000,      // 45 seconds
-    debug: true,               // Enable internal debugging
-    logger: true               // Log SMTP traffic to stdout
+    debug: false,              // Disable verbose debugging for production
+    logger: false              // Disable SMTP traffic logging
   });
 
   return transporter;
@@ -233,8 +233,6 @@ const verifyEmailConfig = async () => {
     return { success: false, error: error.message };
   }
 };
-
-// function verifyEmailConfig was here
 
 // HTML email template for Contact Response
 const getContactResponseEmailTemplate = (name, subject, response) => {

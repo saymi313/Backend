@@ -58,4 +58,4 @@ services:
       - key: EMAIL_PASS
         sync: false
       - key: EMAIL_FROM
-        value: Scholarslee <admin@scholarslee.com>
+        value: Scholarslee <info@scholarslee.com>
