@@ -55,14 +55,12 @@ const loginValidation = [
 const forgotPasswordValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Please provide a valid email')
 ];
 
 const verifyOTPValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('otp')
     .isLength({ min: 4, max: 4 })
@@ -73,7 +71,6 @@ const verifyOTPValidation = [
 const resetPasswordValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
     .isLength({ min: 6 })
@@ -95,11 +92,11 @@ router.use((req, res, next) => {
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.post('/verify-email', [
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
   body('otp').isNumeric().isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
 ], verifyEmail);
 router.post('/resend-verification', [
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required')
+  body('email').isEmail().withMessage('Valid email is required')
 ], resendVerificationEmail);
 
 // Password reset routes (public)

@@ -14,7 +14,6 @@ const router = express.Router();
 const loginValidation = [
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
     .notEmpty()

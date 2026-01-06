@@ -19,7 +19,6 @@ const contactValidation = [
     .withMessage('Last name must be between 1 and 50 characters'),
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('subject')
     .notEmpty()

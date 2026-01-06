@@ -16,8 +16,7 @@ const login = async (req, res) => {
 
     const { email, password } = req.body;
 
-    // Email is already normalized by express-validator's normalizeEmail()
-    // But ensure it's lowercase and trimmed for safety
+    // Ensure email is lowercase and trimmed for consistency
     const normalizedEmail = (email || '').toLowerCase().trim();
 
     if (!normalizedEmail || !password) {
