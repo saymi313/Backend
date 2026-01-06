@@ -16,26 +16,30 @@ const getTransporter = () => {
   }
 
   const port = parseInt(process.env.EMAIL_PORT) || 587;
+  const isSecure = port === 465;
 
-  // Create new transporter with pooling enabled
+  // Create new transporter with pooling enabled and robust settings
   transporter = nodemailer.createTransport({
     pool: true, // Use connection pooling
-    maxConnections: 5, // Max number of parallel connections
-    maxMessages: 100, // Max number of messages per connection
+    maxConnections: 5,
+    maxMessages: 100,
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
     port: port,
-    secure: port === 465, // true for 465 (SSL), false for 587 (TLS)
+    secure: isSecure, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
     },
     tls: {
-      rejectUnauthorized: false // Allow self-signed certificates
+      rejectUnauthorized: false, // Allow self-signed certificates
+      minVersion: 'TLSv1.2'      // Ensure modern TLS
     },
-    // Keep timeouts but ensure they are reasonable
-    connectionTimeout: 15000, // 15 seconds to connect
-    greetingTimeout: 15000,   // 15 seconds for greeting
-    socketTimeout: 20000       // 20 seconds for socket inactivity
+    // Increased timeouts to handle slow cloud network handshakes
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000,   // 30 seconds
+    socketTimeout: 45000,      // 45 seconds
+    debug: true,               // Enable internal debugging
+    logger: true               // Log SMTP traffic to stdout
   });
 
   return transporter;
