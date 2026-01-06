@@ -21,7 +21,7 @@ const requestPasswordReset = async (req, res) => {
 
     // Find user by email
     const user = await User.findOne({ email: normalizedEmail });
-    
+
     // For security, always return success message even if user not found
     // This prevents email enumeration attacks
     if (!user) {
@@ -33,7 +33,7 @@ const requestPasswordReset = async (req, res) => {
     if (user.authProvider !== 'local') {
       console.log(`Password reset attempted for OAuth user: ${normalizedEmail}`);
       return sendErrorResponse(
-        res, 
+        res,
         'This account uses Google Sign-In. Please use Google to access your account.',
         400
       );
@@ -47,17 +47,17 @@ const requestPasswordReset = async (req, res) => {
     // Generate and save OTP
     const { otp } = await PasswordResetOTP.createOTP(normalizedEmail);
 
-    // Send OTP email
-    const emailResult = await sendOTPEmail(normalizedEmail, otp);
-    
-    if (!emailResult.success) {
-      console.error(`Failed to send OTP email to ${normalizedEmail}:`, emailResult.error);
-      // Delete the OTP record since email failed
-      await PasswordResetOTP.deleteMany({ email: normalizedEmail });
-      return sendErrorResponse(res, 'Failed to send OTP email. Please try again later.', 500);
-    }
+    // Send OTP email in background
+    emailService.sendOTPEmail(normalizedEmail, otp)
+      .then(emailResult => {
+        if (emailResult.success) {
+          console.log(`✅ Password reset OTP sent to ${normalizedEmail}`);
+        } else {
+          console.error(`❌ Background reset OTP failed for ${normalizedEmail}:`, emailResult.error);
+        }
+      })
+      .catch(err => console.error(`❌ Background reset OTP error for ${normalizedEmail}:`, err));
 
-    console.log(`✅ OTP sent successfully to ${normalizedEmail}`);
     return sendSuccessResponse(res, 'OTP has been sent to your email address.');
   } catch (error) {
     console.error('Error in requestPasswordReset:', error);
@@ -108,7 +108,7 @@ const verifyOTP = async (req, res) => {
       await otpRecord.incrementAttempts();
       const remainingAttempts = 5 - otpRecord.attempts;
       return sendErrorResponse(
-        res, 
+        res,
         `Invalid OTP. ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining.`,
         400
       );
@@ -140,14 +140,14 @@ const resetPassword = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Find verified OTP record
-    const otpRecord = await PasswordResetOTP.findOne({ 
+    const otpRecord = await PasswordResetOTP.findOne({
       email: normalizedEmail,
       verified: true
     });
 
     if (!otpRecord) {
       return sendErrorResponse(
-        res, 
+        res,
         'Please verify your OTP first before resetting password.',
         400
       );
@@ -162,7 +162,7 @@ const resetPassword = async (req, res) => {
 
     // Find user
     const user = await User.findOne({ email: normalizedEmail });
-    
+
     if (!user) {
       return sendErrorResponse(res, 'User not found.', 404);
     }
@@ -170,7 +170,7 @@ const resetPassword = async (req, res) => {
     // Verify user is using local authentication
     if (user.authProvider !== 'local') {
       return sendErrorResponse(
-        res, 
+        res,
         'This account uses Google Sign-In. Password cannot be changed.',
         400
       );

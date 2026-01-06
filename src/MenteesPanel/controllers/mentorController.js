@@ -200,7 +200,8 @@ const searchMentors = async (req, res) => {
       .select('-verificationDocuments slug')
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await MentorProfile.countDocuments(query);
 
@@ -236,7 +237,8 @@ const getMentorsBySpecialization = async (req, res) => {
       .select('-verificationDocuments')
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await MentorProfile.countDocuments(query);
 
@@ -287,9 +289,10 @@ const getFeaturedMentors = async (req, res) => {
       totalReviews: { $gte: 5 }
     })
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('-verificationDocuments slug')
+      .select('title rating totalReviews userId slug')
       .sort({ rating: -1, totalReviews: -1 })
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     return sendSuccessResponse(res, 'Featured mentors retrieved successfully', { mentors });
   } catch (error) {

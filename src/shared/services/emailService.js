@@ -1,7 +1,15 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter with SMTP configuration (supports Gmail, Hostinger, etc.)
-const createTransporter = () => {
+// Singleton transporter instance
+let transporter = null;
+
+// Get or create transporter with SMTP configuration (supports Gmail, Hostinger, etc.)
+const getTransporter = () => {
+  // Return existing transporter if already created and verified
+  if (transporter) {
+    return transporter;
+  }
+
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn('⚠️  Email configuration not set. OTP emails will not be sent.');
     return null;
@@ -9,7 +17,11 @@ const createTransporter = () => {
 
   const port = parseInt(process.env.EMAIL_PORT) || 587;
 
-  return nodemailer.createTransport({
+  // Create new transporter with pooling enabled
+  transporter = nodemailer.createTransport({
+    pool: true, // Use connection pooling
+    maxConnections: 5, // Max number of parallel connections
+    maxMessages: 100, // Max number of messages per connection
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
     port: port,
     secure: port === 465, // true for 465 (SSL), false for 587 (TLS)
@@ -20,12 +32,17 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: false // Allow self-signed certificates
     },
-    // Add timeouts to prevent hanging
-    connectionTimeout: 10000, // 10 seconds to connect
-    greetingTimeout: 10000,   // 10 seconds for greeting
-    socketTimeout: 10000       // 10 seconds for socket inactivity
+    // Keep timeouts but ensure they are reasonable
+    connectionTimeout: 15000, // 15 seconds to connect
+    greetingTimeout: 15000,   // 15 seconds for greeting
+    socketTimeout: 20000       // 20 seconds for socket inactivity
   });
+
+  return transporter;
 };
+
+// For backward compatibility and internal use
+const createTransporter = getTransporter;
 
 // HTML email template for OTP
 const getOTPEmailTemplate = (otp) => {
