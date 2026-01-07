@@ -108,22 +108,34 @@ const getAllMentorServices = async (req, res) => {
       sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
     }
 
+    // Optimize query for landing page (small limits)
+    const isSmallLimit = limit <= 10;
+
     const services = await MentorService.find(query)
       .populate('mentorId', 'profile firstName lastName')
       .populate('mentorProfile', 'slug')
+      .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
+      .lean() // Convert to plain JS objects for better performance
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await MentorService.countDocuments(query);
+    // Skip count query for small limits (landing page optimization)
+    let total = 0;
+    let pagination = null;
 
-    return sendSuccessResponse(res, 'MentorServices retrieved successfully', {
-      services,
-      pagination: {
+    if (!isSmallLimit) {
+      total = await MentorService.countDocuments(query);
+      pagination = {
         current: parseInt(page),
         pages: Math.ceil(total / limit),
         total
-      }
+      };
+    }
+
+    return sendSuccessResponse(res, 'MentorServices retrieved successfully', {
+      services,
+      ...(pagination && { pagination })
     });
   } catch (error) {
     return sendErrorResponse(res, 'Failed to retrieve services', 500);
@@ -240,7 +252,9 @@ const searchMentorServices = async (req, res) => {
 
     const services = await MentorService.find(searchQuery)
       .populate('mentorId', 'profile firstName lastName')
-      .populate('mentorProfile', 'slug') // Get slug
+      .populate('mentorProfile', 'slug')
+      .select('title description category packages rating totalReviews images slug mentorId mentorProfile tags')
+      .lean() // Convert to plain JS objects for better performance
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -293,6 +307,8 @@ const getMentorServicesByCategory = async (req, res) => {
 
     const services = await MentorService.find(query)
       .populate('mentorId', 'profile firstName lastName')
+      .select('title description category packages rating totalReviews images slug mentorId')
+      .lean()
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -327,6 +343,8 @@ const getMentorServicesByMentor = async (req, res) => {
 
     const services = await MentorService.find(query)
       .populate('mentorId', 'profile firstName lastName')
+      .select('title description category packages rating totalReviews images slug mentorId')
+      .lean()
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -373,6 +391,8 @@ const getFeaturedMentorServices = async (req, res) => {
     })
       .populate('mentorId', 'profile firstName lastName')
       .populate('mentorProfile', 'slug')
+      .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
+      .lean()
       .sort({ rating: -1, totalReviews: -1 })
       .limit(parseInt(limit));
 
@@ -393,6 +413,8 @@ const getPopularMentorServices = async (req, res) => {
     })
       .populate('mentorId', 'profile firstName lastName')
       .populate('mentorProfile', 'slug')
+      .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
+      .lean()
       .sort({ totalReviews: -1, rating: -1 })
       .limit(parseInt(limit));
 

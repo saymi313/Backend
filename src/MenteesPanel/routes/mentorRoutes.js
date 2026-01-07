@@ -6,7 +6,8 @@ const {
   searchMentors,
   getMentorsBySpecialization,
   getMentorSpecializations,
-  getFeaturedMentors
+  getFeaturedMentors,
+  getMentorStudents
 } = require('../controllers/mentorController');
 
 // Public mentor discovery routes (no authentication required)
@@ -28,5 +29,8 @@ router.get('/meta/specializations', getMentorSpecializations);
 
 // Get featured mentors (top rated)
 router.get('/meta/featured', getFeaturedMentors);
+
+// Get students associated with a mentor
+router.get('/:id/students', getMentorStudents);
 
 module.exports = router;

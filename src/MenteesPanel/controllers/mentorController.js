@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const MentorProfile = require('../../MentorPanel/models/MentorProfile');
 const MentorService = require('../../MentorPanel/models/Service');
+const Booking = require('../../shared/models/Booking');
+const User = require('../../shared/models/User');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 const { sanitizeSlug, sanitizeObjectId, sanitizeSearchQuery } = require('../../shared/utils/helpers/sanitization');
 
@@ -93,7 +95,8 @@ const getMentorById = async (req, res) => {
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email')
       .populate('connections', 'profile.firstName profile.lastName profile.avatar email')
       .populate('services')
-      .select('-verificationDocuments');
+      .select('-verificationDocuments')
+      .lean(); // Convert to plain JS object for better performance
 
     if (!mentor) {
       console.log('❌ Mentor not found');
@@ -301,13 +304,80 @@ const getFeaturedMentors = async (req, res) => {
   }
 };
 
+// Get students associated with a mentor (those who have booked sessions)
+const getMentorStudents = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    console.log('🔍 Fetching students for mentor:', id);
+
+    // 1. Get unique mentee IDs from bookings for this mentor
+    // First, find the mentor's user ID if id is a profile ID or slug
+    let mentorUserId = id;
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      const profile = await MentorProfile.findOne({ slug: id }).select('userId');
+      if (profile) mentorUserId = profile.userId;
+    } else {
+      // Check if it's a profile ID instead of a user ID
+      const profile = await MentorProfile.findById(id).select('userId');
+      if (profile) mentorUserId = profile.userId;
+    }
+
+    // Find unique mentee IDs from bookings
+    const menteeIds = await Booking.distinct('menteeId', {
+      mentorId: mentorUserId,
+      isActive: true,
+      status: { $ne: 'cancelled' } // Only count non-cancelled bookings
+    });
+
+    if (!menteeIds || menteeIds.length === 0) {
+      return sendSuccessResponse(res, 'No students found', {
+        students: [],
+        pagination: { current: parseInt(page), pages: 0, total: 0 }
+      });
+    }
+
+    // 2. Fetch mentee profile details with pagination
+    const students = await User.find({
+      _id: { $in: menteeIds },
+      role: 'mentee',
+      isActive: true
+    })
+      .select('profile email createdAt')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await User.countDocuments({
+      _id: { $in: menteeIds },
+      role: 'mentee',
+      isActive: true
+    });
+
+    return sendSuccessResponse(res, 'Mentor students retrieved successfully', {
+      students,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Get mentor students error:', error);
+    return sendErrorResponse(res, 'Failed to retrieve mentor students', 500);
+  }
+};
+
 module.exports = {
   getAllMentors,
   getMentorById,
   searchMentors,
   getMentorsBySpecialization,
   getMentorSpecializations,
-  getFeaturedMentors
+  getFeaturedMentors,
+  getMentorStudents
 };
 
 
