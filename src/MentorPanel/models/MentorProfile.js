@@ -41,7 +41,6 @@ const experienceSchema = new mongoose.Schema({
   },
   duration: {
     type: String,
-    required: [true, 'Duration is required'],
     trim: true
   },
   description: {
@@ -96,7 +95,7 @@ const mentorProfileSchema = new mongoose.Schema({
   achievements: [{
     type: String,
     trim: true,
-    maxlength: [200, 'Achievement cannot exceed 200 characters']
+    maxlength: [1000, 'Achievement cannot exceed 1000 characters']
   }],
   rating: {
     type: Number,
@@ -213,6 +212,15 @@ mentorProfileSchema.index({
   isVerified: 1,
   rating: -1,
   totalReviews: -1
+});
+
+// Pre-save hook to generate slug if not exists
+mentorProfileSchema.pre('save', async function (next) {
+  // Generate slug from userId if it doesn't exist
+  if (!this.slug && this.userId) {
+    this.slug = this.userId.toString();
+  }
+  next();
 });
 
 // Virtual for full name (populated from User)

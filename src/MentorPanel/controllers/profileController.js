@@ -105,6 +105,8 @@ const getMentorProfile = async (req, res) => {
 const updateMentorProfile = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('📝 Updating mentor profile for user:', userId);
+    console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
     const {
       title,
       bio,
@@ -130,9 +132,9 @@ const updateMentorProfile = async (req, res) => {
         bio: bio || background || 'Experienced mentor ready to help students achieve their goals.',
         background: background || '',
         specializations: specializations || [],
-        education: [],
-        experience: [],
-        achievements: [],
+        education: req.body.education || [],
+        experience: req.body.experience || [],
+        achievements: req.body.achievements || [],
         availability: availability || { timezone: 'UTC', workingHours: '9 AM - 5 PM', daysAvailable: [] },
         languages: languages || [],
         socialLinks: socialLinks || {},
@@ -160,14 +162,27 @@ const updateMentorProfile = async (req, res) => {
     if (services) profile.services = services;
     if (successStory !== undefined) profile.successStory = successStory;
 
+    // Add support for education, experience, and achievements
+    if (req.body.education !== undefined) profile.education = req.body.education;
+    if (req.body.experience !== undefined) profile.experience = req.body.experience;
+    if (req.body.achievements !== undefined) profile.achievements = req.body.achievements;
+
+    console.log('💾 Saving profile with data:', {
+      education: profile.education?.length,
+      experience: profile.experience?.length,
+      achievements: profile.achievements?.length
+    });
+
     await profile.save();
     await profile.populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country email');
     await profile.populate('services');
     await profile.populate('connections', 'profile.firstName profile.lastName profile.avatar email');
 
+    console.log('✅ Profile updated successfully');
     return sendSuccessResponse(res, 'Mentor profile updated successfully', { profile });
   } catch (error) {
-    console.error('Update mentor profile error:', error);
+    console.error('❌ Update mentor profile error:', error);
+    console.error('Error stack:', error.stack);
     return sendErrorResponse(res, 'Failed to update mentor profile', 500);
   }
 };
