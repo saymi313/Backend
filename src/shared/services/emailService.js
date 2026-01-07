@@ -1,52 +1,21 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Singleton transporter instance
-let transporter = null;
+// Initialize Resend client
+let resendClient = null;
 
-// Get or create transporter with SMTP configuration (supports Gmail, Hostinger, etc.)
-const getTransporter = () => {
-  // Return existing transporter if already created and verified
-  if (transporter) {
-    return transporter;
+const getResendClient = () => {
+  if (resendClient) {
+    return resendClient;
   }
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('⚠️  Email configuration not set. OTP emails will not be sent.');
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not set. Emails will not be sent.');
     return null;
   }
 
-  const port = parseInt(process.env.EMAIL_PORT) || 587;
-  const isSecure = port === 465;
-
-  // Create new transporter with pooling enabled and robust settings
-  transporter = nodemailer.createTransport({
-    pool: true, // Use connection pooling
-    maxConnections: 5,
-    maxMessages: 100,
-    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: port,
-    secure: isSecure, // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
-      minVersion: 'TLSv1.2'      // Ensure modern TLS
-    },
-    // Increased timeouts to handle slow cloud network handshakes
-    connectionTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000,   // 30 seconds
-    socketTimeout: 45000,      // 45 seconds
-    debug: false,              // Disable verbose debugging for production
-    logger: false              // Disable SMTP traffic logging
-  });
-
-  return transporter;
+  resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
 };
-
-// For backward compatibility and internal use
-const createTransporter = getTransporter;
 
 // HTML email template for OTP
 const getOTPEmailTemplate = (otp) => {
@@ -63,53 +32,36 @@ const getOTPEmailTemplate = (otp) => {
     <tr>
       <td style="padding: 40px 20px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 500px; margin: 0 auto; background-color: #1a1a1a; border: 1px solid #5D38DE; border-radius: 16px; overflow: hidden;">
-          <!-- Header -->
           <tr>
             <td style="padding: 30px 30px 20px; text-align: center; border-bottom: 1px solid #2a2a2a;">
               <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff;">Scholarslee</h1>
             </td>
           </tr>
-          
-          <!-- Content -->
           <tr>
             <td style="padding: 30px;">
               <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #ffffff;">Password Reset Request</h2>
               <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
-                You requested to reset your password. Use the OTP code below to verify your identity:
+                You requested to reset your password. Use the OTP code below:
               </p>
-              
-              <!-- OTP Box -->
               <div style="background: linear-gradient(135deg, #5D38DE 0%, #8B5CF6 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
                 <p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8);">Your OTP Code</p>
                 <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otp}</p>
               </div>
-              
-              <!-- Expiry Notice -->
               <div style="background-color: #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                 <p style="margin: 0; font-size: 13px; color: #f0f0f0; text-align: center;">
                   ⏱️ This code expires in <strong style="color: #5D38DE;">5 minutes</strong>
                 </p>
               </div>
-              
-              <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
-                If you didn't request a password reset, please ignore this email or contact support if you have concerns.
-              </p>
-              
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
                 Best regards,<br>
                 <strong style="color: #ffffff;">The Scholarslee Team</strong>
               </p>
             </td>
           </tr>
-          
-          <!-- Footer -->
           <tr>
             <td style="padding: 20px 30px; border-top: 1px solid #2a2a2a; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #666666;">
                 © ${new Date().getFullYear()} Scholarslee. All rights reserved.
-              </p>
-              <p style="margin: 8px 0 0; font-size: 11px; color: #555555;">
-                This is an automated message. Please do not reply to this email.
               </p>
             </td>
           </tr>
@@ -122,116 +74,61 @@ const getOTPEmailTemplate = (otp) => {
   `;
 };
 
-// Plain text version for email clients that don't support HTML
-const getOTPEmailText = (otp) => {
+// HTML email template for Verification OTP
+const getVerificationEmailTemplate = (otp) => {
   return `
-Password Reset Request - Scholarslee
-
-You requested to reset your password. Use the OTP code below to verify your identity:
-
-Your OTP Code: ${otp}
-
-This code expires in 5 minutes.
-
-If you didn't request a password reset, please ignore this email or contact support if you have concerns.
-
-Best regards,
-The Scholarslee Team
-
-© ${new Date().getFullYear()} Scholarslee. All rights reserved.
-This is an automated message. Please do not reply to this email.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #0a0a0a;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #0a0a0a;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 500px; margin: 0 auto; background-color: #1a1a1a; border: 1px solid #5D38DE; border-radius: 16px; overflow: hidden;">
+          <tr>
+            <td style="padding: 30px 30px 20px; text-align: center; border-bottom: 1px solid #2a2a2a;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff;">Scholarslee</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px;">
+              <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #ffffff;">Verify Your Email</h2>
+              <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
+                Welcome to Scholarslee! Use the OTP code below:
+              </p>
+              <div style="background: linear-gradient(135deg, #5D38DE 0%, #8B5CF6 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8);">Verification Code</p>
+                <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otp}</p>
+              </div>
+              <div style="background-color: #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #f0f0f0; text-align: center;">
+                  ⏱️ This code expires in <strong style="color: #5D38DE;">10 minutes</strong>
+                </p>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
+                Best regards,<br>
+                <strong style="color: #ffffff;">The Scholarslee Team</strong>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 30px; border-top: 1px solid #2a2a2a; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #666666;">
+                © ${new Date().getFullYear()} Scholarslee. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `;
-};
-
-/**
- * Send OTP email for password reset
- * @param {string} email - Recipient email address
- * @param {string} otp - 4-digit OTP code
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
- */
-const sendOTPEmail = async (email, otp) => {
-  const timestamp = new Date().toISOString();
-  console.log('\n🔵 ===== EMAIL SERVICE: Password Reset OTP =====');
-  console.log('🕐 Timestamp:', timestamp);
-  console.log('📧 Recipient:', email);
-  console.log('🔐 OTP:', otp);
-
-  try {
-    const transporter = createTransporter();
-
-    if (!transporter) {
-      console.error('❌ Email transporter not configured');
-      return {
-        success: false,
-        error: 'Email service not configured'
-      };
-    }
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: email,
-      subject: 'Password Reset OTP - Scholarslee',
-      text: getOTPEmailText(otp),
-      html: getOTPEmailTemplate(otp)
-    };
-
-    console.log('📤 Sending password reset OTP...');
-    const sendStartTime = Date.now();
-    const info = await transporter.sendMail(mailOptions);
-    const sendDuration = ((Date.now() - sendStartTime) / 1000).toFixed(2);
-
-    console.log(`✅ OTP email sent successfully in ${sendDuration}s`);
-    console.log('📬 Message ID:', info.messageId);
-    console.log('📨 SMTP Response:', info.response);
-
-    if (info.accepted && info.accepted.length > 0) {
-      console.log('✅ Accepted by server:', info.accepted.join(', '));
-    }
-    if (info.rejected && info.rejected.length > 0) {
-      console.log('⚠️  Rejected by server:', info.rejected.join(', '));
-    }
-    console.log('🔵 ===== EMAIL SERVICE: Complete =====\n');
-
-    return {
-      success: true,
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected
-    };
-  } catch (error) {
-    console.error('❌ Error sending OTP email:', error.message);
-    console.error('📋 Error Details:');
-    console.error('   Code:', error.code);
-    console.error('   Command:', error.command);
-    console.error('🔵 ===== EMAIL SERVICE: Failed =====\n');
-
-    return {
-      success: false,
-      error: error.message,
-      errorCode: error.code
-    };
-  }
-};
-
-/**
- * Verify email configuration by sending a test email
- * @returns {Promise<{success: boolean, error?: string}>}
- */
-const verifyEmailConfig = async () => {
-  try {
-    const transporter = createTransporter();
-
-    if (!transporter) {
-      return { success: false, error: 'Email transporter not configured' };
-    }
-
-    await transporter.verify();
-    console.log('✅ Email configuration verified successfully');
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Email configuration error:', error);
-    return { success: false, error: error.message };
-  }
 };
 
 // HTML email template for Contact Response
@@ -249,14 +146,11 @@ const getContactResponseEmailTemplate = (name, subject, response) => {
     <tr>
       <td style="padding: 40px 20px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border: 1px solid #5D38DE; border-radius: 16px; overflow: hidden;">
-          <!-- Header -->
           <tr>
             <td style="padding: 30px 30px 20px; text-align: center; border-bottom: 1px solid #2a2a2a;">
               <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff;">Scholarslee</h1>
             </td>
           </tr>
-          
-          <!-- Content -->
           <tr>
             <td style="padding: 30px;">
               <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #ffffff;">Response to Your Inquiry</h2>
@@ -266,161 +160,18 @@ const getContactResponseEmailTemplate = (name, subject, response) => {
               <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
                 Thank you for contacting us regarding "<strong>${subject}</strong>". Here is our response:
               </p>
-              
-              <!-- Response Box -->
               <div style="background-color: #2a2a2a; border-left: 4px solid #5D38DE; border-radius: 4px; padding: 24px; margin-bottom: 24px;">
                 <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #ffffff; white-space: pre-wrap;">${response}</p>
               </div>
-              
               <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
-                If you have further questions, feel free to reply to this email or contact us again.
+                If you have further questions, feel free to reply to this email.
               </p>
-              
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
                 Best regards,<br>
                 <strong style="color: #ffffff;">The Scholarslee Team</strong>
               </p>
             </td>
           </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 30px; border-top: 1px solid #2a2a2a; text-align: center;">
-              <p style="margin: 0; font-size: 12px; color: #666666;">
-                © ${new Date().getFullYear()} Scholarslee. All rights reserved.
-              </p>
-              <p style="margin: 8px 0 0; font-size: 11px; color: #555555;">
-                This message was sent to you because you contacted Scholarslee support.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
-};
-
-// Plain text version for Contact Response
-const getContactResponseEmailText = (name, subject, response) => {
-  return `
-Response to Your Inquiry - Scholarslee
-
-Hello ${name},
-
-Thank you for contacting us regarding "${subject}". Here is our response:
-
---------------------------------------------------
-${response}
---------------------------------------------------
-
-If you have further questions, feel free to reply to this email or contact us again.
-
-Best regards,
-The Scholarslee Team
-
-© ${new Date().getFullYear()} Scholarslee. All rights reserved.
-  `;
-};
-
-/**
- * Send Contact Response email
- * @param {string} email - Recipient email address
- * @param {string} name - Recipient name
- * @param {string} subject - Original message subject
- * @param {string} response - Admin response content
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
- */
-const sendContactResponseEmail = async (email, name, subject, response) => {
-  try {
-    const transporter = createTransporter();
-
-    if (!transporter) {
-      console.error('Email transporter not configured');
-      return {
-        success: false,
-        error: 'Email service not configured'
-      };
-    }
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: email,
-      subject: `Re: ${subject} - Scholarslee Support`,
-      text: getContactResponseEmailText(name, subject, response),
-      html: getContactResponseEmailTemplate(name, subject, response)
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Contact response email sent to ${email}: ${info.messageId}`);
-
-    return {
-      success: true,
-      messageId: info.messageId
-    };
-  } catch (error) {
-    console.error('❌ Error sending Contact Response email:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-
-// HTML email template for Verification OTP
-const getVerificationEmailTemplate = (otp) => {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify Your Email</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #0a0a0a;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #0a0a0a;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 500px; margin: 0 auto; background-color: #1a1a1a; border: 1px solid #5D38DE; border-radius: 16px; overflow: hidden;">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 30px 30px 20px; text-align: center; border-bottom: 1px solid #2a2a2a;">
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff;">Scholarslee</h1>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 30px;">
-              <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #ffffff;">Verify Your Email</h2>
-              <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
-                Welcome to Scholarslee! Use the OTP code below to verify your email address and complete your registration:
-              </p>
-              
-              <!-- OTP Box -->
-              <div style="background: linear-gradient(135deg, #5D38DE 0%, #8B5CF6 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
-                <p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8);">Verification Code</p>
-                <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otp}</p>
-              </div>
-              
-              <!-- Expiry Notice -->
-              <div style="background-color: #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 13px; color: #f0f0f0; text-align: center;">
-                  ⏱️ This code expires in <strong style="color: #5D38DE;">10 minutes</strong>
-                </p>
-              </div>
-              
-              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #a0a0a0;">
-                Best regards,<br>
-                <strong style="color: #ffffff;">The Scholarslee Team</strong>
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
           <tr>
             <td style="padding: 20px 30px; border-top: 1px solid #2a2a2a; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #666666;">
@@ -437,104 +188,140 @@ const getVerificationEmailTemplate = (otp) => {
   `;
 };
 
-// Plain text version for Verification OTP
-const getVerificationEmailText = (otp) => {
-  return `
-Verify Your Email - Scholarslee
-
-Welcome to Scholarslee! Use the OTP code below to verify your email address:
-
-Verification Code: ${otp}
-
-This code expires in 10 minutes.
-
-Best regards,
-The Scholarslee Team
-  `;
-};
-
 /**
- * Send Verification Email
- * @param {string} email - Recipient email string
- * @param {string} otp - OTP code
+ * Send OTP email for password reset using Resend
  */
-const sendVerificationEmail = async (email, otp) => {
-  const timestamp = new Date().toISOString();
-  console.log('\n🔵 ===== EMAIL SERVICE: Starting Verification Email =====');
-  console.log('🕐 Timestamp:', timestamp);
-  console.log('📧 Recipient:', email);
+const sendOTPEmail = async (email, otp) => {
+  console.log('\n🔵 ===== EMAIL SERVICE: Password Reset OTP (Resend) =====');
+  console.log('📧 To:', email);
   console.log('🔐 OTP:', otp);
 
   try {
-    console.log('⚙️  Creating transporter...');
-    const transporter = createTransporter();
+    const resend = getResendClient();
 
-    if (!transporter) {
-      console.error('❌ Email transporter not configured - missing EMAIL_USER or EMAIL_PASS');
+    if (!resend) {
+      console.error('❌ Resend client not configured');
       return { success: false, error: 'Email service not configured' };
     }
-    console.log('✅ Transporter created');
 
-    console.log('📝 SMTP Configuration:');
-    console.log('   Host:', process.env.EMAIL_HOST);
-    console.log('   Port:', process.env.EMAIL_PORT);
-    console.log('   User:', process.env.EMAIL_USER);
-    console.log('   From:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
+    const startTime = Date.now();
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'Scholarslee <onboarding@resend.dev>',
+      to: [email],
+      subject: 'Password Reset OTP - Scholarslee',
+      html: getOTPEmailTemplate(otp)
+    });
 
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: email,
-      subject: 'Verify Your Email - Scholarslee',
-      text: getVerificationEmailText(otp),
-      html: getVerificationEmailTemplate(otp)
-    };
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-    console.log('📤 Attempting to send email via SMTP...');
-    const sendStartTime = Date.now();
-
-    const info = await transporter.sendMail(mailOptions);
-
-    const sendDuration = ((Date.now() - sendStartTime) / 1000).toFixed(2);
-    console.log(`✅ EMAIL SENT SUCCESSFULLY in ${sendDuration}s`);
-    console.log('📬 Message ID:', info.messageId);
-    console.log('📨 SMTP Response:', info.response);
-
-    // Log acceptance details
-    if (info.accepted && info.accepted.length > 0) {
-      console.log('✅ Accepted by server:', info.accepted.join(', '));
-    }
-    if (info.rejected && info.rejected.length > 0) {
-      console.log('⚠️  Rejected by server:', info.rejected.join(', '));
-    }
-    if (info.pending && info.pending.length > 0) {
-      console.log('⏳ Pending:', info.pending.join(', '));
+    if (error) {
+      console.error(`❌ Resend API error in ${duration}s:`, error);
+      return { success: false, error: error.message || 'Failed to send email' };
     }
 
-    console.log('🔵 ===== EMAIL SERVICE: Complete =====\n');
+    console.log(`✅ OTP sent successfully in ${duration}s`);
+    console.log('📬 Message ID:', data.id);
+    console.log('🔵 ===== EMAIL SERVICE: Success =====\n');
 
-    return {
-      success: true,
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-      response: info.response
-    };
+    return { success: true, messageId: data.id };
   } catch (error) {
-    console.error('❌ Error sending Verification email:', error.message);
-    console.error('📋 Error Details:');
-    console.error('   Code:', error.code);
-    console.error('   Command:', error.command);
-    if (error.responseCode) {
-      console.error('   Response Code:', error.responseCode);
-    }
+    console.error('❌ Error sending OTP:', error.message);
     console.error('🔵 ===== EMAIL SERVICE: Failed =====\n');
+    return { success: false, error: error.message };
+  }
+};
 
-    return {
-      success: false,
-      error: error.message,
-      errorCode: error.code,
-      errorCommand: error.command
-    };
+/**
+ * Send Verification Email using Resend
+ */
+const sendVerificationEmail = async (email, otp) => {
+  console.log('\n🔵 ===== EMAIL SERVICE: Verification Email (Resend) =====');
+  console.log('📧 To:', email);
+  console.log('🔐 OTP:', otp);
+
+  try {
+    const resend = getResendClient();
+
+    if (!resend) {
+      console.error('❌ Resend client not configured');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    const startTime = Date.now();
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'Scholarslee <onboarding@resend.dev>',
+      to: [email],
+      subject: 'Verify Your Email - Scholarslee',
+      html: getVerificationEmailTemplate(otp)
+    });
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    if (error) {
+      console.error(`❌ Resend API error in ${duration}s:`, error);
+      return { success: false, error: error.message || 'Failed to send email' };
+    }
+
+    console.log(`✅ Verification email sent in ${duration}s`);
+    console.log('📬 Message ID:', data.id);
+    console.log('🔵 ===== EMAIL SERVICE: Success =====\n');
+
+    return { success: true, messageId: data.id, response: 'Email sent via Resend' };
+  } catch (error) {
+    console.error('❌ Error sending verification email:', error.message);
+    console.error('🔵 ===== EMAIL SERVICE: Failed =====\n');
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send Contact Response email using Resend
+ */
+const sendContactResponseEmail = async (email, name, subject, response) => {
+  try {
+    const resend = getResendClient();
+
+    if (!resend) {
+      console.error('Resend client not configured');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'Scholarslee <onboarding@resend.dev>',
+      to: [email],
+      subject: `Re: ${subject} - Scholarslee Support`,
+      html: getContactResponseEmailTemplate(name, subject, response)
+    });
+
+    if (error) {
+      console.error('❌ Contact response error:', error);
+      return { success: false, error: error.message || 'Failed to send email' };
+    }
+
+    console.log(`✅ Contact response sent to ${email}: ${data.id}`);
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Error sending contact response:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Verify email configuration
+ */
+const verifyEmailConfig = async () => {
+  try {
+    const resend = getResendClient();
+
+    if (!resend) {
+      return { success: false, error: 'Resend client not configured' };
+    }
+
+    console.log('✅ Resend email configuration verified');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Email configuration error:', error);
+    return { success: false, error: error.message };
   }
 };
 

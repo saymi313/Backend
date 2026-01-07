@@ -49,13 +49,7 @@ services:
         sync: false
       - key: PLATFORM_FEE_PERCENTAGE
         value: 10
-      - key: EMAIL_HOST
-        value: smtp.hostinger.com
-      - key: EMAIL_PORT
-        value: 587
-      - key: EMAIL_USER
-        sync: false
-      - key: EMAIL_PASS
+      - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: Scholarslee <info@scholarslee.com>
+        value: Scholarslee <no-reply@scholarslee.com>
