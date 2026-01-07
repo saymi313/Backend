@@ -215,6 +215,7 @@ const verifyEmail = async (req, res) => {
       console.log('✅ Found pending user, creating actual user...');
 
       // Create actual user from pending user
+      // Password is already hashed in PendingUser - User model will detect and skip re-hashing
       const user = await User.create({
         email: pendingUser.email,
         password: pendingUser.password,

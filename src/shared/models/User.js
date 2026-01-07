@@ -134,6 +134,14 @@ userSchema.pre('save', async function (next) {
   }
 
   try {
+    // Check if password is already hashed (bcrypt hashes start with $2a$, $2b$, $2x$, or $2y$)
+    // This prevents double-hashing when copying from PendingUser to User
+    const bcryptHashRegex = /^\$2[abxy]\$\d{2}\$/;
+    if (bcryptHashRegex.test(this.password)) {
+      console.log('⚠️  Password is already hashed, skipping re-hash');
+      return next();
+    }
+
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();

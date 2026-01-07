@@ -48,7 +48,7 @@ const requestPasswordReset = async (req, res) => {
     const { otp } = await PasswordResetOTP.createOTP(normalizedEmail);
 
     // Send OTP email in background
-    emailService.sendOTPEmail(normalizedEmail, otp)
+    sendOTPEmail(normalizedEmail, otp)
       .then(emailResult => {
         if (emailResult.success) {
           console.log(`✅ Password reset OTP sent to ${normalizedEmail}`);
