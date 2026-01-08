@@ -150,8 +150,8 @@ serviceSchema.virtual('mentorProfile', {
 serviceSchema.set('toJSON', { virtuals: true });
 serviceSchema.set('toObject', { virtuals: true });
 
-// Pre-save middleware to validate packages
-serviceSchema.pre('save', function (next) {
+// Pre-save middleware to validate packages and generate slug
+serviceSchema.pre('save', async function (next) {
   if (this.packages.length === 0) {
     return next(new Error('At least one package is required'));
   }
@@ -162,6 +162,44 @@ serviceSchema.pre('save', function (next) {
 
   if (packageNames.length !== uniqueNames.size) {
     return next(new Error('Package names must be unique within a service'));
+  }
+
+  // Generate slug from title if it doesn't exist
+  if (!this.slug && this.title) {
+    try {
+      let baseSlug = this.title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // remove non-alphanumeric except spaces and hyphens
+        .replace(/[\s_-]+/g, '-') // replace spaces, underscores, hyphens with single hyphen
+        .replace(/^-+|-+$/g, ''); // trim hyphens
+
+      if (!baseSlug) {
+        baseSlug = 'service';
+      }
+
+      let slug = baseSlug;
+      let counter = 1;
+      // Check for uniqueness within the mentor's services
+      let exists = await mongoose.model('MentorService').findOne({
+        slug,
+        mentorId: this.mentorId
+      });
+
+      while (exists) {
+        slug = `${baseSlug}-${counter}`;
+        exists = await mongoose.model('MentorService').findOne({
+          slug,
+          mentorId: this.mentorId
+        });
+        counter++;
+      }
+
+      this.slug = slug;
+    } catch (err) {
+      console.error('Error generating service slug:', err);
+      // Fallback is okay, it will remain undefined and potentially use ID in frontend
+    }
   }
 
   next();

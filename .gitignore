@@ -58,3 +58,14 @@ reset-mentor-password.js
 restore-soban-services-db-fix.js
 restore-soban-services.js
 test-email-service.js
+
+# Utility directories and debugging
+scripts/
+debug.txt
+*.txt
+*.log
+google-credentials.json
+api-test-output.txt
+mentor-status-output.txt
+services-check-output.txt
+temp_*
