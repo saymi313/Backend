@@ -216,9 +216,47 @@ mentorProfileSchema.index({
 
 // Pre-save hook to generate slug if not exists
 mentorProfileSchema.pre('save', async function (next) {
-  // Generate slug from userId if it doesn't exist
+  // Generate slug from name if it doesn't exist
   if (!this.slug && this.userId) {
-    this.slug = this.userId.toString();
+    try {
+      const User = mongoose.model('User');
+      const user = await User.findById(this.userId);
+
+      if (!user) {
+        // Fallback to userId if user not found
+        this.slug = this.userId.toString();
+        return next();
+      }
+
+      const { firstName, lastName } = user.profile;
+      let baseSlug = `${firstName || ''} ${lastName || ''}`
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // remove non-alphanumeric except spaces and hyphens
+        .replace(/[\s_-]+/g, '-') // replace spaces, underscores, hyphens with single hyphen
+        .replace(/^-+|-+$/g, ''); // trim hyphens
+
+      if (!baseSlug) {
+        baseSlug = 'mentor';
+      }
+
+      let slug = baseSlug;
+      let counter = 1;
+      // Check for uniqueness
+      let exists = await mongoose.model('MentorProfile').findOne({ slug });
+
+      while (exists) {
+        slug = `${baseSlug}-${counter}`;
+        exists = await mongoose.model('MentorProfile').findOne({ slug });
+        counter++;
+      }
+
+      this.slug = slug;
+    } catch (err) {
+      console.error('Error generating slug:', err);
+      // Final fallback to userId on error to prevent save failure
+      this.slug = this.userId.toString();
+    }
   }
   next();
 });
