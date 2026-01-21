@@ -191,7 +191,25 @@ const mentorProfileSchema = new mongoose.Schema({
     type: String,
     enum: ['Beginner', 'Level 1 Seller', 'Level 2 Seller', 'Best Seller'],
     default: 'Beginner'
-  }
+  },
+  wallet: {
+    availableBalance: { type: Number, default: 0 },
+    pendingEarnings: { type: Number, default: 0 },
+    totalWithdrawn: { type: Number, default: 0 }
+  },
+  payoutMethods: [{
+    type: {
+      type: String,
+      enum: ['Bank Transfer'],
+      required: true,
+      default: 'Bank Transfer'
+    },
+    bankName: { type: String, required: true },
+    country: { type: String, required: true },
+    accountNumber: { type: String, required: true },
+    accountTitle: { type: String, required: true },
+    isDefault: { type: Boolean, default: false }
+  }]
 }, {
   timestamps: true
 });

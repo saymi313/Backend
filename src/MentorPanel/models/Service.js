@@ -9,7 +9,7 @@ const packageSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: [true, 'Package price is required'],
-    min: [0, 'Price cannot be negative']
+    min: [10, 'Minimum price must be $10']
   },
   duration: {
     type: String,

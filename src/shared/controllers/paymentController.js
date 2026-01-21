@@ -80,10 +80,21 @@ const createCheckoutSession = async (req, res) => {
       return sendErrorResponse(res, 'Only mentees can purchase services', 403);
     }
 
-    const amountInCents = Math.round(selectedPackage.price * 100);
-    const platformFeePercentage = parseFloat(process.env.PLATFORM_FEE_PERCENTAGE || 10);
-    const platformFeeInCents = Math.round((amountInCents * platformFeePercentage) / 100);
-    const mentorAmountInCents = amountInCents - platformFeeInCents;
+    // --- NEW FEE LOGIC ---
+    // Base price set by mentor
+    const basePrice = selectedPackage.price;
+
+    // Stripe fee: 3% + $0.30 (approximate, added on top of base price)
+    // Formula to ensure you receive the full base price after stripe deduction:
+    // (Amount + 0.30) / (1 - 0.029)
+    const totalAmount = Math.ceil(((basePrice + 0.30) / (1 - 0.029)) * 100) / 100;
+    const amountInCents = Math.round(totalAmount * 100);
+
+    // Platform fee (0% at point of purchase - 20% applied at withdrawal)
+    const platformFee = 0;
+
+    // Mentor gets: 100% of BasePrice
+    const mentorAmount = basePrice;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -95,7 +106,7 @@ const createCheckoutSession = async (req, res) => {
             unit_amount: amountInCents,
             product_data: {
               name: service.title,
-              description: `${selectedPackage.name} package`,
+              description: `${selectedPackage.name} package (Includes processing fee)`,
               metadata: {
                 serviceId: service._id.toString(),
                 packageId: selectedPackage._id.toString(),
@@ -115,6 +126,9 @@ const createCheckoutSession = async (req, res) => {
         scheduledDate: scheduledDateObj.toISOString(),
         duration: duration ? String(duration) : '',
         notes,
+        basePriceRequested: String(basePrice),
+        platformFee: String(platformFee),
+        mentorAmount: String(mentorAmount)
       },
       success_url: `${getSuccessUrl()}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getCancelUrl()}?service_id=${service._id.toString()}&package_id=${selectedPackage._id.toString()}`,
@@ -127,10 +141,10 @@ const createCheckoutSession = async (req, res) => {
       serviceTitle: service.title,
       packageId: selectedPackage._id.toString(),
       packageName: selectedPackage.name,
-      amount: selectedPackage.price,
+      amount: totalAmount, // Mentee pays total including stripe fees
       currency: 'usd',
-      platformFee: platformFeeInCents / 100,
-      mentorAmount: mentorAmountInCents / 100,
+      platformFee: 0, // No commission at purchase
+      mentorAmount: basePrice, // Mentor gets full base price
       stripeSessionId: session.id,
       status: 'pending',
       metadata: {
@@ -139,6 +153,7 @@ const createCheckoutSession = async (req, res) => {
         scheduledDate: scheduledDateObj.toISOString(),
         duration: duration ? String(duration) : '',
         notes,
+        basePrice: String(basePrice)
       },
     });
 
@@ -147,6 +162,10 @@ const createCheckoutSession = async (req, res) => {
     return sendSuccessResponse(res, 'Checkout session created', {
       sessionId: session.id,
       url: session.url,
+      breakdown: {
+        servicePrice: basePrice,
+        totalToPay: totalAmount
+      }
     });
   } catch (error) {
     console.error('Error creating checkout session:', error);
@@ -264,6 +283,18 @@ const verifySession = async (req, res) => {
       payment.status = 'succeeded';
       payment.stripePaymentIntentId = session.payment_intent;
       await payment.save();
+
+      // --- NEW: Credit Mentor Wallet ---
+      try {
+        const MentorProfile = require('../../MentorPanel/models/MentorProfile');
+        await MentorProfile.findOneAndUpdate(
+          { userId: payment.mentorId },
+          { $inc: { 'wallet.availableBalance': payment.mentorAmount } }
+        );
+      } catch (walletError) {
+        console.error('Error crediting mentor wallet:', walletError);
+      }
+      // ---------------------------------
 
       if (!payment.bookingId) {
         try {

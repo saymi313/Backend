@@ -113,7 +113,7 @@ const getAllMentorServices = async (req, res) => {
 
     const services = await MentorService.find(query)
       .populate('mentorId', 'profile firstName lastName')
-      .populate('mentorProfile', 'slug')
+      .populate('mentorProfile', 'slug availability')
       .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
       .lean() // Convert to plain JS objects for better performance
       .sort(sortOptions)
@@ -164,13 +164,14 @@ const getMentorServiceById = async (req, res) => {
       isActive: true
     });
 
-    // Get MentorProfile ID for navigation
-    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id');
+    // Get MentorProfile for navigation and availability
+    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id availability');
 
-    // Convert service to object and add feedback count and mentorProfileId
+    // Convert service to object and add feedback count, mentorProfileId, and availability
     const serviceObject = service.toObject();
     serviceObject.feedbackCount = feedbackCount;
     serviceObject.mentorProfileId = mentorProfile ? mentorProfile._id : null;
+    serviceObject.mentorAvailability = mentorProfile ? mentorProfile.availability : null;
 
     return sendSuccessResponse(res, 'MentorService retrieved successfully', {
       service: serviceObject
@@ -252,7 +253,7 @@ const searchMentorServices = async (req, res) => {
 
     const services = await MentorService.find(searchQuery)
       .populate('mentorId', 'profile firstName lastName')
-      .populate('mentorProfile', 'slug')
+      .populate('mentorProfile', 'slug availability')
       .select('title description category packages rating totalReviews images slug mentorId mentorProfile tags')
       .lean() // Convert to plain JS objects for better performance
       .sort(sortOptions)
@@ -390,7 +391,7 @@ const getFeaturedMentorServices = async (req, res) => {
       rating: { $gte: 4.0 }
     })
       .populate('mentorId', 'profile firstName lastName')
-      .populate('mentorProfile', 'slug')
+      .populate('mentorProfile', 'slug availability')
       .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
       .lean()
       .sort({ rating: -1, totalReviews: -1 })
@@ -412,7 +413,7 @@ const getPopularMentorServices = async (req, res) => {
       isActive: true
     })
       .populate('mentorId', 'profile firstName lastName')
-      .populate('mentorProfile', 'slug')
+      .populate('mentorProfile', 'slug availability')
       .select('title description category packages rating totalReviews images slug mentorId mentorProfile')
       .lean()
       .sort({ totalReviews: -1, rating: -1 })
@@ -461,13 +462,14 @@ const getServiceByMentorAndSlug = async (req, res) => {
       isActive: true
     });
 
-    // Get MentorProfile ID for navigation
-    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id slug');
+    // Get MentorProfile for navigation and availability
+    const mentorProfile = await MentorProfile.findOne({ userId: service.mentorId._id }).select('_id slug availability');
 
     const serviceObject = service.toObject();
     serviceObject.feedbackCount = feedbackCount;
     serviceObject.mentorProfileId = mentorProfile ? mentorProfile._id : null;
     serviceObject.mentorSlug = mentorProfile ? mentorProfile.slug : null;
+    serviceObject.mentorAvailability = mentorProfile ? mentorProfile.availability : null;
 
     return sendSuccessResponse(res, 'Service retrieved successfully', {
       service: serviceObject

@@ -107,6 +107,7 @@ app.use('/api/mentors', require('./src/MentorPanel/routes/feedbackRoutes'));
 app.use('/api/mentors/google-meet', require('./src/MentorPanel/routes/googleMeetRoutes'));
 app.use('/api/mentors/badges', require('./src/MentorPanel/routes/badgesRoutes'));
 app.use('/api/mentors/revenue', require('./src/MentorPanel/routes/revenueRoutes'));
+app.use('/api/mentors/wallet', require('./src/MentorPanel/routes/walletRoutes'));
 console.log('✅ Mentor routes loaded');
 
 // Admin Panel Routes
@@ -119,6 +120,7 @@ app.use('/api/admin/sessions', require('./src/AdminPanel/routes/sessionsRoutes')
 app.use('/api/admin/mentors', require('./src/AdminPanel/routes/mentorsRoutes'));
 app.use('/api/admin/settings', require('./src/AdminPanel/routes/settingsRoutes'));
 app.use('/api/admin/users', require('./src/AdminPanel/routes/usersRoutes'));
+app.use('/api/admin/payouts', require('./src/AdminPanel/routes/payoutRoutes'));
 
 // 404 handler - catch all routes
 app.use((req, res, next) => {

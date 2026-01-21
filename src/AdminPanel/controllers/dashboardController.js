@@ -3,6 +3,7 @@ const Booking = require('../../shared/models/Booking');
 const Meeting = require('../../shared/models/Meeting');
 const MentorService = require('../../MentorPanel/models/Service');
 const MentorProfile = require('../../MentorPanel/models/MentorProfile');
+const PayoutRequest = require('../../shared/models/PayoutRequest');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 const { USER_ROLES } = require('../../shared/utils/constants/roles');
 
@@ -11,7 +12,7 @@ const getDashboardMetrics = async (req, res) => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     // Revenue MTD: Sum of totalAmount from paid bookings in current month
     const revenueMTDResult = await Booking.aggregate([
       {
@@ -47,11 +48,17 @@ const getDashboardMetrics = async (req, res) => {
       isActive: true
     });
 
+    // Pending Payouts: Count of pending withdrawal requests
+    const payoutsPending = await PayoutRequest.countDocuments({
+      status: 'pending'
+    });
+
     return sendSuccessResponse(res, 'Dashboard metrics retrieved successfully', {
       revenueMTD: Math.round(revenueMTD * 100) / 100, // Round to 2 decimal places
       mentees,
       activeMentors,
-      activeServices
+      activeServices,
+      payoutsPending
     });
   } catch (error) {
     console.error('Error getting dashboard metrics:', error);
@@ -74,7 +81,7 @@ const getRevenueChart = async (req, res) => {
         d.setDate(now.getDate() - i);
         const startOfDay = new Date(d.setHours(0, 0, 0, 0));
         const endOfDay = new Date(d.setHours(23, 59, 59, 999));
-        
+
         days.push({
           date: new Date(startOfDay),
           label: d.toLocaleDateString('en-US', { weekday: 'short' }),

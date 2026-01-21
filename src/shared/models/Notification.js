@@ -27,6 +27,8 @@ const notificationSchema = new mongoose.Schema({
       'mentor_login_paused',
       'service_approved',
       'service_rejected',
+      'payout_completed',
+      'payout_rejected',
       'admin_announcement',
       'admin_response'
     ],
@@ -152,13 +154,13 @@ notificationSchema.index({ scheduledFor: 1 });
 notificationSchema.index({ expiresAt: 1 });
 
 // Virtual for time since sent
-notificationSchema.virtual('timeAgo').get(function() {
+notificationSchema.virtual('timeAgo').get(function () {
   const now = new Date();
   const diff = now - this.sentAt;
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
   if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
   if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
@@ -166,7 +168,7 @@ notificationSchema.virtual('timeAgo').get(function() {
 });
 
 // Virtual for priority color
-notificationSchema.virtual('priorityColor').get(function() {
+notificationSchema.virtual('priorityColor').get(function () {
   const colorMap = {
     'low': 'text-gray-500',
     'medium': 'text-blue-500',
@@ -177,7 +179,7 @@ notificationSchema.virtual('priorityColor').get(function() {
 });
 
 // Virtual for status color
-notificationSchema.virtual('statusColor').get(function() {
+notificationSchema.virtual('statusColor').get(function () {
   const colorMap = {
     'unread': 'text-blue-600',
     'read': 'text-gray-500',
@@ -191,7 +193,7 @@ notificationSchema.set('toJSON', { virtuals: true });
 notificationSchema.set('toObject', { virtuals: true });
 
 // Pre-save middleware to set default values
-notificationSchema.pre('save', function(next) {
+notificationSchema.pre('save', function (next) {
   // Set expiration date for certain notification types
   if (!this.expiresAt) {
     const expirationMap = {
@@ -200,17 +202,17 @@ notificationSchema.pre('save', function(next) {
       'payment_successful': 30 * 24 * 60 * 60 * 1000, // 30 days
       'system_announcement': 90 * 24 * 60 * 60 * 1000 // 90 days
     };
-    
+
     if (expirationMap[this.type]) {
       this.expiresAt = new Date(Date.now() + expirationMap[this.type]);
     }
   }
-  
+
   next();
 });
 
 // Static method to get notifications by user
-notificationSchema.statics.getByUser = function(userId, options = {}) {
+notificationSchema.statics.getByUser = function (userId, options = {}) {
   const {
     status = 'unread',
     type = null,
@@ -218,24 +220,24 @@ notificationSchema.statics.getByUser = function(userId, options = {}) {
     skip = 0,
     includeExpired = false
   } = options;
-  
+
   const query = { userId, isActive: true };
-  
+
   if (status !== 'all') {
     query.status = status;
   }
-  
+
   if (type) {
     query.type = type;
   }
-  
+
   if (!includeExpired) {
     query.$or = [
       { expiresAt: null },
       { expiresAt: { $gt: new Date() } }
     ];
   }
-  
+
   return this.find(query)
     .populate('data.bookingId', 'status scheduledDate totalAmount')
     .populate('data.meetingId', 'title scheduledDate meetingLink')
@@ -246,7 +248,7 @@ notificationSchema.statics.getByUser = function(userId, options = {}) {
 };
 
 // Static method to get unread count
-notificationSchema.statics.getUnreadCount = function(userId) {
+notificationSchema.statics.getUnreadCount = function (userId) {
   return this.countDocuments({
     userId,
     isRead: false,
@@ -259,13 +261,13 @@ notificationSchema.statics.getUnreadCount = function(userId) {
 };
 
 // Static method to mark as read
-notificationSchema.statics.markAsRead = function(userId, notificationIds = []) {
+notificationSchema.statics.markAsRead = function (userId, notificationIds = []) {
   const query = { userId, isActive: true };
-  
+
   if (notificationIds.length > 0) {
     query._id = { $in: notificationIds };
   }
-  
+
   return this.updateMany(query, {
     isRead: true,
     status: 'read',
@@ -274,7 +276,7 @@ notificationSchema.statics.markAsRead = function(userId, notificationIds = []) {
 };
 
 // Static method to archive notifications
-notificationSchema.statics.archive = function(userId, notificationIds) {
+notificationSchema.statics.archive = function (userId, notificationIds) {
   return this.updateMany(
     { _id: { $in: notificationIds }, userId },
     { status: 'archived' }
@@ -282,22 +284,22 @@ notificationSchema.statics.archive = function(userId, notificationIds) {
 };
 
 // Static method to create notification
-notificationSchema.statics.createNotification = function(notificationData) {
+notificationSchema.statics.createNotification = function (notificationData) {
   return this.create(notificationData);
 };
 
 // Static method to send bulk notifications
-notificationSchema.statics.sendBulk = function(userIds, notificationData) {
+notificationSchema.statics.sendBulk = function (userIds, notificationData) {
   const notifications = userIds.map(userId => ({
     ...notificationData,
     userId
   }));
-  
+
   return this.insertMany(notifications);
 };
 
 // Instance method to mark as read
-notificationSchema.methods.markAsRead = function() {
+notificationSchema.methods.markAsRead = function () {
   this.isRead = true;
   this.status = 'read';
   this.readAt = new Date();
@@ -305,13 +307,13 @@ notificationSchema.methods.markAsRead = function() {
 };
 
 // Instance method to archive
-notificationSchema.methods.archive = function() {
+notificationSchema.methods.archive = function () {
   this.status = 'archived';
   return this.save();
 };
 
 // Instance method to update delivery status
-notificationSchema.methods.updateDeliveryStatus = function(channel, status, error = null) {
+notificationSchema.methods.updateDeliveryStatus = function (channel, status, error = null) {
   const deliveryChannel = this.deliveryChannels.find(ch => ch.type === channel);
   if (deliveryChannel) {
     deliveryChannel.status = status;
