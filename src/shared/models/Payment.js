@@ -109,7 +109,7 @@ paymentSchema.index({ bookingId: 1 });
 paymentSchema.index({ menteeId: 1 });
 paymentSchema.index({ mentorId: 1 });
 paymentSchema.index({ serviceId: 1 });
-paymentSchema.index({ stripeSessionId: 1 });
+// stripeSessionId already has unique: true which creates an index
 paymentSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

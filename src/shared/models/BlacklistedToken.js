@@ -25,18 +25,18 @@ const blacklistedTokenSchema = new mongoose.Schema({
 });
 
 // Index for faster lookups
-blacklistedTokenSchema.index({ token: 1 });
+// token already has index: true and unique: true in the schema
 blacklistedTokenSchema.index({ userId: 1 });
 blacklistedTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index to auto-delete expired tokens
 
 // Static method to check if token is blacklisted
-blacklistedTokenSchema.statics.isBlacklisted = async function(token) {
+blacklistedTokenSchema.statics.isBlacklisted = async function (token) {
   const blacklisted = await this.findOne({ token });
   return !!blacklisted;
 };
 
 // Static method to blacklist a token
-blacklistedTokenSchema.statics.blacklistToken = async function(token, userId, expiresAt) {
+blacklistedTokenSchema.statics.blacklistToken = async function (token, userId, expiresAt) {
   try {
     await this.create({
       token,
