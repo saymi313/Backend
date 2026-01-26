@@ -121,6 +121,53 @@ const getMenteeProfile = async (req, res) => {
   }
 };
 
+// Get mentee profile by user ID (for mentors to view)
+const getMenteeProfileById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const User = require('../../shared/models/User');
+
+    // Get user data
+    const user = await User.findById(id).select('profile email');
+    if (!user) {
+      return sendErrorResponse(res, 'User not found', 404);
+    }
+
+    const profile = await MenteeProfile.findOne({ userId: id })
+      .populate('userId', 'profile email');
+
+    // If profile doesn't exist, return minimal user info
+    if (!profile) {
+      const defaultProfile = {
+        userId: {
+          _id: user._id,
+          profile: user.profile || {},
+          email: user.email
+        },
+        educationLevel: '',
+        currentInstitution: '',
+        studyGoals: [],
+        targetCountries: [],
+        budget: 0,
+        budgetCurrency: 'USD',
+        preferences: {},
+        academicInterests: [],
+        careerGoals: [],
+        timeline: '',
+        previousExperience: '',
+        challenges: [],
+        socialLinks: {}
+      };
+      return sendSuccessResponse(res, 'Mentee profile retrieved successfully', { profile: defaultProfile });
+    }
+
+    return sendSuccessResponse(res, 'Mentee profile retrieved successfully', { profile });
+  } catch (error) {
+    console.error('Error getting mentee profile by ID:', error);
+    return sendErrorResponse(res, 'Failed to retrieve mentee profile', 500);
+  }
+};
+
 // Update mentee profile
 const updateMenteeProfile = async (req, res) => {
   try {
@@ -289,7 +336,7 @@ const updateCareerGoals = async (req, res) => {
   }
 };
 
-// Update preferences
+// Update preferences  
 const updatePreferences = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -375,6 +422,7 @@ const getProfileCompleteness = async (req, res) => {
 module.exports = {
   createMenteeProfile,
   getMenteeProfile,
+  getMenteeProfileById,
   updateMenteeProfile,
   updateStudyGoals,
   updateTargetCountries,

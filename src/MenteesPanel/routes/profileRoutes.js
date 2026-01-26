@@ -4,6 +4,7 @@ const { authenticate } = require('../../shared/middlewares/auth');
 const {
   createMenteeProfile,
   getMenteeProfile,
+  getMenteeProfileById,
   updateMenteeProfile,
   updateStudyGoals,
   updateTargetCountries,
@@ -20,6 +21,7 @@ router.use(authenticate);
 // Mentee profile CRUD routes
 router.post('/', createMenteeProfile);
 router.get('/', getMenteeProfile);
+router.get('/:id', getMenteeProfileById); // Get mentee profile by user ID (for mentors)
 router.put('/', updateMenteeProfile);
 
 // Specific profile sections
