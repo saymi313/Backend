@@ -109,7 +109,14 @@ const getUpcomingSessions = async (req, res) => {
             .sort({ scheduledDate: 1 })
             .limit(5)
             .populate('menteeId', 'profile.firstName profile.lastName profile.country')
-            .populate('serviceId', 'title')
+            .populate({
+                path: 'bookingId',
+                select: 'serviceId',
+                populate: {
+                    path: 'serviceId',
+                    select: 'title'
+                }
+            })
             .lean();
 
         console.log(`✅ Found ${upcomingMeetings.length} upcoming meetings`);
@@ -138,7 +145,7 @@ const getUpcomingSessions = async (req, res) => {
 
             return {
                 id: meeting._id,
-                serviceName: meeting.serviceId?.title || 'Service',
+                serviceName: meeting.bookingId?.serviceId?.title || meeting.title || 'Session',
                 studentName: studentName,
                 date: date,
                 time: time,

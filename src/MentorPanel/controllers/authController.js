@@ -47,7 +47,7 @@ const register = async (req, res) => {
       email,
       password,
       role: USER_ROLES.MENTOR,
-      mentorApprovalStatus: requiresApproval ? 'pending' : 'approved', // Auto-approve if flag is disabled
+      mentorApprovalStatus: requiresApproval ? 'pending' : null, // Auto-approve if flag is disabled (null = approved)
       profile: {
         firstName,
         lastName
