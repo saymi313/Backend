@@ -20,13 +20,7 @@ const getAllMentors = async (req, res) => {
     } = req.query;
 
     let query = {
-      isActive: true,
-      isVerified: true,
-      // Profile completion requirements
-      specializations: { $exists: true, $ne: [] },
-      education: { $exists: true, $ne: [] },
-      experience: { $exists: true, $ne: [] },
-      background: { $exists: true, $ne: null, $ne: '' }
+      isActive: true
     };
 
     // Add filters
@@ -53,30 +47,55 @@ const getAllMentors = async (req, res) => {
     // Optimize query for landing page (small limits)
     const isSmallLimit = limit <= 10;
 
-    const mentors = await MentorProfile.find(query)
+    // Fetch all mentors matching query without limit (for proper sorting)
+    const allMentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
       .select('title rating totalReviews userId slug badge')
-      .lean() // Convert to plain JS objects for better performance
-      .sort({ rating: -1, totalReviews: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .lean(); // Convert to plain JS objects for better performance
 
-    // Skip count query for small limits (landing page optimization)
-    let total = 0;
-    let pagination = null;
+    // Define badge priority (higher number = higher priority)
+    const badgePriority = {
+      'Best Seller': 4,
+      'Level 2 Seller': 3,
+      'Level 1 Seller': 2,
+      'Beginner': 1
+    };
 
-    if (!isSmallLimit) {
-      total = await MentorProfile.countDocuments(query);
-      pagination = {
-        current: parseInt(page),
-        pages: Math.ceil(total / limit),
-        total
-      };
-    }
+    // Sort by badge level (highest first), then by rating (highest first)
+    allMentors.sort((a, b) => {
+      const badgeA = badgePriority[a.badge] || badgePriority['Beginner'];
+      const badgeB = badgePriority[b.badge] || badgePriority['Beginner'];
+
+      // First sort by badge level (descending)
+      if (badgeA !== badgeB) {
+        return badgeB - badgeA;
+      }
+
+      // If badges are equal, sort by rating (descending)
+      if (a.rating !== b.rating) {
+        return b.rating - a.rating;
+      }
+
+      // If ratings are also equal, sort by total reviews (descending)
+      return b.totalReviews - a.totalReviews;
+    });
+
+    // Apply pagination after sorting
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + (limit * 1);
+    const mentors = allMentors.slice(startIndex, endIndex);
+
+    // Always return pagination data
+    const total = allMentors.length;
+    const pagination = {
+      current: parseInt(page),
+      pages: Math.ceil(total / limit),
+      total
+    };
 
     return sendSuccessResponse(res, 'Mentors retrieved successfully', {
       mentors,
-      ...(pagination && { pagination })
+      pagination
     });
   } catch (error) {
     console.error('Get all mentors error:', error);

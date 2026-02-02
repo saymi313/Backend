@@ -60,6 +60,13 @@ reset-mentor-password.js
 restore-soban-services-db-fix.js
 restore-soban-services.js
 test-email-service.js
+check-mentor-counts.js
+delete-users.js
+add-usman-reviews.js
+check-usman.js
+list-mentors.js
+mentor-counts.json
+usman-reviews-log.txt
 
 # Utility directories and debugging
 scripts/
