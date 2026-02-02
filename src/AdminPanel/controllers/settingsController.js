@@ -12,7 +12,8 @@ const getSettings = async (req, res) => {
         featureFlags: {
           enableMentorVerification: settings.featureFlags?.enableMentorVerification ?? true,
           enablePayouts: settings.featureFlags?.enablePayouts ?? true,
-          autoApproveFeedbacks: settings.featureFlags?.autoApproveFeedbacks ?? false
+          autoApproveFeedbacks: settings.featureFlags?.autoApproveFeedbacks ?? false,
+          autoApproveServices: settings.featureFlags?.autoApproveServices ?? false
         }
       }
     });
@@ -58,6 +59,9 @@ const updateSettings = async (req, res) => {
       if (featureFlags.autoApproveFeedbacks !== undefined && typeof featureFlags.autoApproveFeedbacks !== 'boolean') {
         return sendErrorResponse(res, 'autoApproveFeedbacks must be a boolean', 400);
       }
+      if (featureFlags.autoApproveServices !== undefined && typeof featureFlags.autoApproveServices !== 'boolean') {
+        return sendErrorResponse(res, 'autoApproveServices must be a boolean', 400);
+      }
     }
 
     // Build update object
@@ -69,7 +73,8 @@ const updateSettings = async (req, res) => {
       updateData.featureFlags = {
         enableMentorVerification: featureFlags.enableMentorVerification ?? true,
         enablePayouts: featureFlags.enablePayouts ?? true,
-        autoApproveFeedbacks: featureFlags.autoApproveFeedbacks ?? false
+        autoApproveFeedbacks: featureFlags.autoApproveFeedbacks ?? false,
+        autoApproveServices: featureFlags.autoApproveServices ?? false
       };
     }
 
@@ -82,7 +87,8 @@ const updateSettings = async (req, res) => {
         featureFlags: {
           enableMentorVerification: settings.featureFlags?.enableMentorVerification ?? true,
           enablePayouts: settings.featureFlags?.enablePayouts ?? true,
-          autoApproveFeedbacks: settings.featureFlags?.autoApproveFeedbacks ?? false
+          autoApproveFeedbacks: settings.featureFlags?.autoApproveFeedbacks ?? false,
+          autoApproveServices: settings.featureFlags?.autoApproveServices ?? false
         }
       }
     });
@@ -134,7 +140,8 @@ const addCategory = async (req, res) => {
         featureFlags: {
           enableMentorVerification: updatedSettings.featureFlags?.enableMentorVerification ?? true,
           enablePayouts: updatedSettings.featureFlags?.enablePayouts ?? true,
-          autoApproveFeedbacks: updatedSettings.featureFlags?.autoApproveFeedbacks ?? false
+          autoApproveFeedbacks: updatedSettings.featureFlags?.autoApproveFeedbacks ?? false,
+          autoApproveServices: updatedSettings.featureFlags?.autoApproveServices ?? false
         }
       }
     });
@@ -183,7 +190,8 @@ const removeCategory = async (req, res) => {
         featureFlags: {
           enableMentorVerification: updatedSettings.featureFlags?.enableMentorVerification ?? true,
           enablePayouts: updatedSettings.featureFlags?.enablePayouts ?? true,
-          autoApproveFeedbacks: updatedSettings.featureFlags?.autoApproveFeedbacks ?? false
+          autoApproveFeedbacks: updatedSettings.featureFlags?.autoApproveFeedbacks ?? false,
+          autoApproveServices: updatedSettings.featureFlags?.autoApproveServices ?? false
         }
       }
     });

@@ -18,6 +18,10 @@ const settingsSchema = new mongoose.Schema({
     autoApproveFeedbacks: {
       type: Boolean,
       default: false
+    },
+    autoApproveServices: {
+      type: Boolean,
+      default: false
     }
   },
   updatedBy: {
@@ -30,7 +34,7 @@ const settingsSchema = new mongoose.Schema({
 });
 
 // Ensure only one settings document exists (singleton pattern)
-settingsSchema.statics.getSettings = async function() {
+settingsSchema.statics.getSettings = async function () {
   let settings = await this.findOne();
   if (!settings) {
     // Create default settings if none exist
@@ -50,7 +54,8 @@ settingsSchema.statics.getSettings = async function() {
       featureFlags: {
         enableMentorVerification: true,
         enablePayouts: true,
-        autoApproveFeedbacks: false
+        autoApproveFeedbacks: false,
+        autoApproveServices: false
       }
     });
   }
@@ -58,7 +63,7 @@ settingsSchema.statics.getSettings = async function() {
 };
 
 // Update settings (always updates the single document)
-settingsSchema.statics.updateSettings = async function(updateData, adminId) {
+settingsSchema.statics.updateSettings = async function (updateData, adminId) {
   const settings = await this.findOneAndUpdate(
     {},
     {

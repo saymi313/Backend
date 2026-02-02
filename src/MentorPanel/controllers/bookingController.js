@@ -148,6 +148,41 @@ const createMeeting = async (req, res) => {
     booking.meetingId = meetingId;
     await booking.save();
 
+    // Send email notification to mentee
+    try {
+      const emailService = require('../../shared/services/emailService');
+      const populatedBooking = await Booking.findById(booking._id)
+        .populate('menteeId', 'profile email')
+        .populate('mentorId', 'profile');
+
+      if (populatedBooking && populatedBooking.menteeId && populatedBooking.menteeId.email) {
+        const menteeName = `${populatedBooking.menteeId.profile.firstName} ${populatedBooking.menteeId.profile.lastName}`;
+        const mentorName = `${populatedBooking.mentorId.profile.firstName} ${populatedBooking.mentorId.profile.lastName}`;
+        const meetingDateFormatted = meeting.scheduledDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        await emailService.sendMeetingScheduledEmail(
+          populatedBooking.menteeId.email,
+          menteeName,
+          mentorName,
+          meeting.title,
+          meetingDateFormatted,
+          meetingLink,
+          meeting.duration
+        );
+        console.log('✅ Meeting scheduled email sent to mentee');
+      }
+    } catch (emailError) {
+      console.error('⚠️ Failed to send meeting scheduled email (continuing):', emailError.message);
+      // Don't fail the request if email fails
+    }
+
     // Create notification for mentee with meeting link
     const formattedDate = meeting.scheduledDate.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -171,8 +206,8 @@ const createMeeting = async (req, res) => {
         duration: meeting.duration
       },
       priority: 'high',
-          actionUrl: '/mentees/bookings', // Redirect to bookings/meetings page
-          actionText: 'View Meeting'
+      actionUrl: '/mentees/bookings', // Redirect to bookings/meetings page
+      actionText: 'View Meeting'
     });
 
     // Emit notification via socket to mentee if online
@@ -395,7 +430,7 @@ const deleteMeeting = async (req, res) => {
           getGoogleOAuthCredentials,
         } = require('../../shared/utils/helpers/googleMeetCredentialStore');
         const googleMeetService = new GoogleMeetService();
-        
+
         const credentials = getGoogleOAuthCredentials();
         if (credentials && credentials.clientId && credentials.clientSecret) {
           const initResult = googleMeetService.initializeClient(credentials);
@@ -545,7 +580,7 @@ const getMentorMentees = async (req, res) => {
   try {
     // Fetch all active mentees from the system
     const User = require('../../shared/models/User');
-    const mentees = await User.find({ 
+    const mentees = await User.find({
       role: 'mentee',
       isActive: true
     })

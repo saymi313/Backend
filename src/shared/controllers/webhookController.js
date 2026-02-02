@@ -90,6 +90,32 @@ const createBookingFromPayment = async (paymentDoc) => {
     priority: 'high',
   });
 
+  // Send payment confirmation email to mentor
+  try {
+    const emailService = require('../services/emailService');
+    const User = require('../models/User');
+    const mentor = await User.findById(paymentDoc.mentorId).select('profile email');
+    const mentee = await User.findById(paymentDoc.menteeId).select('profile');
+
+    if (mentor && mentor.email && mentee) {
+      const mentorName = `${mentor.profile.firstName} ${mentor.profile.lastName}`;
+      const menteeName = `${mentee.profile.firstName} ${mentee.profile.lastName}`;
+
+      await emailService.sendPaymentConfirmationEmail(
+        mentor.email,
+        mentorName,
+        paymentDoc.amount,
+        service.title,
+        menteeName,
+        booking._id.toString()
+      );
+      console.log('✅ Payment confirmation email sent to mentor');
+    }
+  } catch (emailError) {
+    console.error('⚠️ Failed to send payment confirmation email (continuing):', emailError.message);
+    // Don't fail the request if email fails
+  }
+
   await Notification.createNotification({
     userId: paymentDoc.menteeId,
     type: 'payment_successful',

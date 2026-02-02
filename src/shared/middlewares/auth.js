@@ -35,6 +35,36 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+const authenticateOptional = async (req, res, next) => {
+  try {
+    const authHeader = req.header('Authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next(); // No token, proceed as guest
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+      // Check if token is blacklisted first
+      const isBlacklisted = await BlacklistedToken.isBlacklisted(token);
+      if (isBlacklisted) {
+        return next(); // Invalid token, proceed as guest
+      }
+
+      const decoded = verifyToken(token);
+      req.user = decoded;
+    } catch (err) {
+      // Token invalid/expired, just proceed as guest
+    }
+
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
 module.exports = {
   authenticate,
+  authenticateOptional
 };

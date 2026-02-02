@@ -108,7 +108,11 @@ const menteeProfileSchema = new mongoose.Schema({
     default: 0,
     min: 0,
     max: 100
-  }
+  },
+  following: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MentorProfile' // Reference to the MentorProfile, not User
+  }]
 }, {
   timestamps: true
 });

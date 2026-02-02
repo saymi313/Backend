@@ -45,7 +45,9 @@ check-db-consistency.js
 check-email-config.js
 check-mentor-status.js
 check-payments.js
+check-profile-completion.js
 check_env.js
+fix-null-slugs.js
 check_meetings.js
 cleanup-dummy-services.js
 create-mentor-profile.js

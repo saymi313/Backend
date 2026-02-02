@@ -21,8 +21,8 @@ const getAllServices = async (req, res) => {
     const formattedServices = services.map(service => ({
       id: service._id.toString(),
       title: service.title,
-      mentor: service.mentorId 
-        ? `${service.mentorId.firstName} ${service.mentorId.lastName}` 
+      mentor: service.mentorId
+        ? `${service.mentorId.firstName} ${service.mentorId.lastName}`
         : 'Unknown Mentor',
       category: service.category,
       rating: service.rating ? service.rating.toFixed(1) : '0.0',
@@ -74,8 +74,54 @@ const getServicesByCategory = async (req, res) => {
   }
 };
 
+// Approve service
+const approveService = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const service = await MentorService.findById(id);
+    if (!service) {
+      return sendErrorResponse(res, 'Service not found', 404);
+    }
+
+    service.status = 'approved';
+    await service.save();
+
+    return sendSuccessResponse(res, 'Service approved successfully', { service });
+  } catch (error) {
+    console.error('Error approving service:', error);
+    return sendErrorResponse(res, 'Failed to approve service', 500);
+  }
+};
+
+// Reject service
+const rejectService = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const service = await MentorService.findById(id);
+    if (!service) {
+      return sendErrorResponse(res, 'Service not found', 404);
+    }
+
+    service.status = 'rejected';
+    if (reason) {
+      service.rejectionReason = reason; // Optional: store rejection reason
+    }
+    await service.save();
+
+    return sendErrorResponse(res, 'Service rejected successfully', { service });
+  } catch (error) {
+    console.error('Error rejecting service:', error);
+    return sendErrorResponse(res, 'Failed to reject service', 500);
+  }
+};
+
 module.exports = {
   getAllServices,
-  getServicesByCategory
+  getServicesByCategory,
+  approveService,
+  rejectService
 };
 

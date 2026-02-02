@@ -12,7 +12,7 @@ const getAllMentors = async (req, res) => {
 
     // Build query
     const query = { role: USER_ROLES.MENTOR, isActive: true };
-    
+
     // Handle status filter (null means approved for existing mentors)
     if (status !== 'all') {
       if (status === 'approved') {
@@ -153,7 +153,7 @@ const updateMentorApprovalStatus = async (req, res) => {
       if (status === 'approved') {
         notificationMessage = 'Congratulations! Your mentor account has been approved. You can now log in and start offering your services.';
       } else {
-        notificationMessage = reason 
+        notificationMessage = reason
           ? `Your mentor account has been rejected. Reason: ${reason}`
           : 'Your mentor account has been rejected. Please contact support for more information.';
       }
@@ -168,6 +168,23 @@ const updateMentorApprovalStatus = async (req, res) => {
         actionUrl: status === 'approved' ? '/mentors/login' : '/contact',
         actionText: status === 'approved' ? 'Login Now' : 'Contact Support'
       });
+
+      // Send approval email to mentor if approved
+      if (status === 'approved') {
+        try {
+          const emailService = require('../../shared/services/emailService');
+          const mentorName = `${mentor.profile.firstName} ${mentor.profile.lastName}`;
+
+          await emailService.sendMentorApprovedEmail(
+            mentor.email,
+            mentorName
+          );
+          console.log('✅ Mentor approval email sent');
+        } catch (emailError) {
+          console.error('⚠️ Failed to send mentor approval email (continuing):', emailError.message);
+          // Don't fail the request if email fails
+        }
+      }
     } catch (notificationError) {
       console.error('Error sending notification to mentor:', notificationError);
       // Don't fail the request if notification fails
@@ -218,7 +235,7 @@ const toggleMentorLoginPause = async (req, res) => {
         userId: mentor._id,
         type: 'mentor_login_paused',
         title: isPaused ? 'Login Access Paused' : 'Login Access Restored',
-        message: isPaused 
+        message: isPaused
           ? 'Your login access has been paused by admin. Please contact support for more information.'
           : 'Your login access has been restored. You can now log in to your account.',
         priority: 'high',

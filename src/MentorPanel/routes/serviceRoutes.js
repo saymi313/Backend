@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticate } = require('../../shared/middlewares/auth');
 const { authorize } = require('../../shared/middlewares/roleAuth');
 const { checkMentorLoginStatus } = require('../middlewares/mentorAuth');
-const { uploadServiceImagesMiddleware, processUploadedFiles, cleanupFiles } = require('../../shared/middlewares/upload');
+const { uploadServiceImagesMiddleware, cleanupFiles } = require('../../shared/middlewares/upload');
 const {
   createMentorService,
   getMyMentorServices,
@@ -35,7 +35,7 @@ router.use((req, res, next) => {
 });
 
 // Service CRUD routes
-router.post('/', uploadServiceImagesMiddleware, processUploadedFiles, createMentorService);
+router.post('/', uploadServiceImagesMiddleware, createMentorService);
 router.get('/', getMyMentorServices);
 router.get('/stats', getMentorServiceStats);
 router.get('/:id', getMentorServiceById);
@@ -46,7 +46,7 @@ router.delete('/:id', (req, res, next) => {
 }, deleteMentorService);
 
 // Image management routes
-router.post('/:id/images', uploadServiceImagesMiddleware, processUploadedFiles, uploadMentorServiceImages);
+router.post('/:id/images', uploadServiceImagesMiddleware, uploadMentorServiceImages);
 router.delete('/:id/images', removeMentorServiceImage);
 
 module.exports = router;

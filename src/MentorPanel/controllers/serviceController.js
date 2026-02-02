@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const MentorService = require('../models/Service');
+const Settings = require('../../shared/models/Settings');
 const { processUploadedFiles, cleanupFiles } = require('../../shared/middlewares/upload');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 
@@ -30,6 +31,13 @@ const createMentorService = async (req, res) => {
       }
     }
 
+    // Check auto-approval setting
+    const settings = await Settings.getSettings();
+    const autoApprove = settings.featureFlags?.autoApproveServices ?? false;
+    const serviceStatus = autoApprove ? 'approved' : 'pending';
+
+    console.log('⚙️ Auto-approval setting:', { autoApprove, serviceStatus });
+
     // Create service data
     const serviceData = {
       mentorId,
@@ -40,7 +48,8 @@ const createMentorService = async (req, res) => {
       images: imageUrls,
       tags: tags ? (typeof tags === 'string' ? JSON.parse(tags) : tags) : [],
       location: location ? (typeof location === 'string' ? JSON.parse(location) : location) : {},
-      availability: availability ? (typeof availability === 'string' ? JSON.parse(availability) : availability) : {}
+      availability: availability ? (typeof availability === 'string' ? JSON.parse(availability) : availability) : {},
+      status: serviceStatus
     };
 
     const service = new MentorService(serviceData);

@@ -3,6 +3,7 @@ const MentorProfile = require('../../MentorPanel/models/MentorProfile');
 const MentorService = require('../../MentorPanel/models/Service');
 const Booking = require('../../shared/models/Booking');
 const User = require('../../shared/models/User');
+const MenteeProfile = require('../models/MenteeProfile');
 const { sendSuccessResponse, sendErrorResponse } = require('../../shared/utils/helpers/responseHelpers');
 const { sanitizeSlug, sanitizeObjectId, sanitizeSearchQuery } = require('../../shared/utils/helpers/sanitization');
 
@@ -18,7 +19,15 @@ const getAllMentors = async (req, res) => {
       search
     } = req.query;
 
-    let query = { isActive: true, isVerified: true };
+    let query = {
+      isActive: true,
+      isVerified: true,
+      // Profile completion requirements
+      specializations: { $exists: true, $ne: [] },
+      education: { $exists: true, $ne: [] },
+      experience: { $exists: true, $ne: [] },
+      background: { $exists: true, $ne: null, $ne: '' }
+    };
 
     // Add filters
     if (specialization) {
@@ -46,7 +55,7 @@ const getAllMentors = async (req, res) => {
 
     const mentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
-      .select('title rating totalReviews userId slug')
+      .select('title rating totalReviews userId slug badge')
       .lean() // Convert to plain JS objects for better performance
       .sort({ rating: -1, totalReviews: -1 })
       .limit(limit * 1)
@@ -145,17 +154,145 @@ const getMentorById = async (req, res) => {
     mentor.services = services;
     console.log(`✅ Attached ${services.length} fresh services to response`);
 
+    // Add follower stats and status if user is logged in
+    const followerCount = mentor.followers ? mentor.followers.length : 0;
+    let isFollowing = false;
+
+    if (req.user && req.user.role === 'mentee') {
+      const menteeProfile = await MenteeProfile.findOne({ userId: req.user.id });
+      if (menteeProfile && menteeProfile.following) {
+        // Check if mentor's profile ID is in mentee's following list
+        // Note: mentor._id is the profile ID
+        isFollowing = menteeProfile.following.some(id => id.toString() === mentor._id.toString());
+      }
+    }
+
+    // Attach to response (create a new object to avoid mutation issues)
+    const mentorWithFollowStats = {
+      ...mentor,
+      followerCount,
+      isFollowing
+    };
+
     console.log('✅ Mentor retrieved successfully:', mentor.userId?.profile?.firstName);
     console.log(`📊 Services count: ${mentor.services?.length || 0}`);
+    console.log(`👥 Follower count: ${followerCount}, Is Following: ${isFollowing}`);
     fs.appendFileSync('debug.txt', `Final services count: ${mentor.services?.length || 0}\n`);
 
-    return sendSuccessResponse(res, 'Mentor retrieved successfully', { mentor });
+    return sendSuccessResponse(res, 'Mentor retrieved successfully', { mentor: mentorWithFollowStats });
   } catch (error) {
     console.error('Get mentor by ID error:', error);
-    try {
-      require('fs').appendFileSync('debug.txt', `ERROR: ${error.message}\n`);
-    } catch (e) { console.error('Error writing to debug file', e); }
     return sendErrorResponse(res, 'Failed to retrieve mentor', 500);
+  }
+};
+
+// Follow a mentor
+const followMentor = async (req, res) => {
+  try {
+    const { id } = req.params; // Mentor Profile ID or Slug
+    const menteeUserId = req.user.id;
+
+    console.log(`👤 User ${menteeUserId} attempting to follow mentor ${id}`);
+
+    // 1. Get Mentee Profile
+    const menteeProfile = await MenteeProfile.findOne({ userId: menteeUserId });
+    if (!menteeProfile) {
+      return sendErrorResponse(res, 'Mentee profile not found', 404);
+    }
+
+    // 2. Get Mentor Profile
+    let mentorQuery = {};
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      mentorQuery._id = id;
+    } else {
+      mentorQuery.slug = id;
+    }
+
+    const mentorProfile = await MentorProfile.findOne(mentorQuery);
+    if (!mentorProfile) {
+      return sendErrorResponse(res, 'Mentor profile not found', 404);
+    }
+
+    const mentorProfileId = mentorProfile._id;
+
+    // 3. Check if already following
+    if (menteeProfile.following.includes(mentorProfileId)) {
+      return sendErrorResponse(res, 'You are already following this mentor', 400);
+    }
+
+    // 4. Update Mentee Profile (add to following)
+    menteeProfile.following.push(mentorProfileId);
+    await menteeProfile.save();
+
+    // 5. Update Mentor Profile (add to followers)
+    // Avoid duplicates in case of race conditions
+    if (!mentorProfile.followers.includes(menteeUserId)) {
+      mentorProfile.followers.push(menteeUserId);
+      await mentorProfile.save();
+    }
+
+    console.log(`✅ User ${menteeUserId} successfully followed mentor ${mentorProfileId}`);
+
+    return sendSuccessResponse(res, 'You are now following this mentor', {
+      isFollowing: true,
+      followerCount: mentorProfile.followers.length
+    });
+  } catch (error) {
+    console.error('Follow mentor error:', error);
+    return sendErrorResponse(res, 'Failed to follow mentor', 500);
+  }
+};
+
+// Unfollow a mentor
+const unfollowMentor = async (req, res) => {
+  try {
+    const { id } = req.params; // Mentor Profile ID or Slug
+    const menteeUserId = req.user.id;
+
+    console.log(`👤 User ${menteeUserId} attempting to unfollow mentor ${id}`);
+
+    // 1. Get Mentee Profile
+    const menteeProfile = await MenteeProfile.findOne({ userId: menteeUserId });
+    if (!menteeProfile) {
+      return sendErrorResponse(res, 'Mentee profile not found', 404);
+    }
+
+    // 2. Get Mentor Profile
+    let mentorQuery = {};
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      mentorQuery._id = id;
+    } else {
+      mentorQuery.slug = id;
+    }
+
+    const mentorProfile = await MentorProfile.findOne(mentorQuery);
+    if (!mentorProfile) {
+      return sendErrorResponse(res, 'Mentor profile not found', 404);
+    }
+
+    const mentorProfileId = mentorProfile._id;
+
+    // 3. Update Mentee Profile (remove from following)
+    menteeProfile.following = menteeProfile.following.filter(
+      id => id.toString() !== mentorProfileId.toString()
+    );
+    await menteeProfile.save();
+
+    // 4. Update Mentor Profile (remove from followers)
+    mentorProfile.followers = mentorProfile.followers.filter(
+      id => id.toString() !== menteeUserId.toString()
+    );
+    await mentorProfile.save();
+
+    console.log(`✅ User ${menteeUserId} successfully unfollowed mentor ${mentorProfileId}`);
+
+    return sendSuccessResponse(res, 'You have unfollowed this mentor', {
+      isFollowing: false,
+      followerCount: mentorProfile.followers.length
+    });
+  } catch (error) {
+    console.error('Unfollow mentor error:', error);
+    return sendErrorResponse(res, 'Failed to unfollow mentor', 500);
   }
 };
 
@@ -178,6 +315,11 @@ const searchMentors = async (req, res) => {
     let query = {
       isActive: true,
       isVerified: true,
+      // Profile completion requirements
+      specializations: { $exists: true, $ne: [] },
+      education: { $exists: true, $ne: [] },
+      experience: { $exists: true, $ne: [] },
+      background: { $exists: true, $ne: null, $ne: '' },
       $or: [
         { title: { $regex: q, $options: 'i' } },
         { bio: { $regex: q, $options: 'i' } },
@@ -232,7 +374,11 @@ const getMentorsBySpecialization = async (req, res) => {
     const query = {
       isActive: true,
       isVerified: true,
-      specializations: { $in: [new RegExp(specialization, 'i')] }
+      specializations: { $in: [new RegExp(specialization, 'i')] },
+      // Profile completion requirements
+      education: { $exists: true, $ne: [] },
+      experience: { $exists: true, $ne: [] },
+      background: { $exists: true, $ne: null, $ne: '' }
     };
 
     const mentors = await MentorProfile.find(query)
@@ -289,7 +435,12 @@ const getFeaturedMentors = async (req, res) => {
       isActive: true,
       isVerified: true,
       rating: { $gte: 4.0 },
-      totalReviews: { $gte: 5 }
+      totalReviews: { $gte: 5 },
+      // Profile completion requirements
+      specializations: { $exists: true, $ne: [] },
+      education: { $exists: true, $ne: [] },
+      experience: { $exists: true, $ne: [] },
+      background: { $exists: true, $ne: null, $ne: '' }
     })
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
       .select('title rating totalReviews userId slug')
@@ -370,6 +521,84 @@ const getMentorStudents = async (req, res) => {
   }
 };
 
+// Get mentor followers
+const getMentorFollowers = async (req, res) => {
+  try {
+    const { id } = req.params; // Mentor Id (could be User ID or Profile ID)
+    const { page = 1, limit = 10 } = req.query;
+
+    console.log('🔍 Fetching followers for mentor:', id);
+
+    let mentorProfile;
+    // Check if id is Profile ID or User ID
+    // If it looks like an ObjectId, we need to check both
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      mentorProfile = await MentorProfile.findOne({
+        $or: [{ _id: id }, { userId: id }]
+      });
+    } else {
+      // Slug
+      mentorProfile = await MentorProfile.findOne({ slug: id });
+    }
+
+    if (!mentorProfile) {
+      return sendErrorResponse(res, 'Mentor not found', 404);
+    }
+
+    if (!mentorProfile.followers || mentorProfile.followers.length === 0) {
+      return sendSuccessResponse(res, 'No followers found', {
+        followers: [],
+        pagination: { current: parseInt(page), pages: 0, total: 0 }
+      });
+    }
+
+    const followerIds = mentorProfile.followers;
+
+    console.log('📊 Total follower IDs in profile:', followerIds.length);
+    console.log('Sample IDs:', followerIds.slice(0, 3));
+
+    // Fetch followers using User.find (same pattern as students)
+    const followers = await User.find({
+      _id: { $in: followerIds },
+      role: 'mentee'
+      // Temporarily removed isActive filter for debugging
+    })
+      .select('profile email createdAt')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    console.log('👥 Followers WITH role=mentee filter:', followers.length);
+
+    // Debug: check without role filter
+    const testWithoutRole = await User.find({ _id: { $in: followerIds } }).select('role _id').lean();
+    console.log('🔓 Users WITHOUT role filter:', testWithoutRole.length);
+    if (testWithoutRole.length > 0) {
+      console.log('Sample user:', testWithoutRole[0]);
+    }
+    console.log('=== FOLLOWERS DEBUG END ===');
+
+    const total = await User.countDocuments({
+      _id: { $in: followerIds },
+      role: 'mentee'
+    });
+
+    return sendSuccessResponse(res, 'Mentor followers retrieved successfully', {
+      followers,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+
+  } catch (error) {
+    console.error('Get mentor followers error:', error);
+    return sendErrorResponse(res, 'Failed to retrieve mentor followers', 500);
+  }
+};
+
 module.exports = {
   getAllMentors,
   getMentorById,
@@ -377,7 +606,10 @@ module.exports = {
   getMentorsBySpecialization,
   getMentorSpecializations,
   getFeaturedMentors,
-  getMentorStudents
+  getMentorStudents,
+  followMentor,
+  unfollowMentor,
+  getMentorFollowers
 };
 
 

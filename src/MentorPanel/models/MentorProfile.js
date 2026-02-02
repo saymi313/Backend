@@ -176,9 +176,19 @@ const mentorProfileSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'MentorService'
   }],
+  followers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   successStory: {
     title: { type: String, trim: true },
-    content: { type: String, trim: true, maxlength: 5000 },
+    content: { type: String, trim: true, maxlength: 5000 }, // Legacy field, keeping for backwards compatibility
+    background: { type: String, trim: true, maxlength: 2000 },
+    challenges: { type: String, trim: true, maxlength: 2000 },
+    journey: { type: String, trim: true, maxlength: 3000 },
+    currentStatus: { type: String, trim: true, maxlength: 2000 },
+    keyLearnings: { type: String, trim: true, maxlength: 2000 },
+    motivation: { type: String, trim: true, maxlength: 2000 },
     mediaUrls: [{ type: String }],
     createdAt: { type: Date, default: null },
     isPublished: { type: Boolean, default: false }
@@ -282,6 +292,18 @@ mentorProfileSchema.pre('save', async function (next) {
 // Virtual for full name (populated from User)
 mentorProfileSchema.virtual('fullName').get(function () {
   return this.userId?.profile?.firstName + ' ' + this.userId?.profile?.lastName;
+});
+
+// Virtual for profile completion check
+mentorProfileSchema.virtual('isProfileComplete').get(function () {
+  return !!(
+    this.title &&
+    this.bio &&
+    this.specializations?.length > 0 &&
+    this.education?.length > 0 &&
+    this.experience?.length > 0 &&
+    this.background
+  );
 });
 
 // Method to calculate average rating
