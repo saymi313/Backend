@@ -121,6 +121,8 @@ app.use('/api/admin/mentors', require('./src/AdminPanel/routes/mentorsRoutes'));
 app.use('/api/admin/settings', require('./src/AdminPanel/routes/settingsRoutes'));
 app.use('/api/admin/users', require('./src/AdminPanel/routes/usersRoutes'));
 app.use('/api/admin/payouts', require('./src/AdminPanel/routes/payoutRoutes'));
+app.use('/api/admin/admins', require('./src/AdminPanel/routes/adminsRoutes'));
+app.use('/api/admin/logs', require('./src/AdminPanel/routes/logsRoutes'));
 
 // 404 handler - catch all routes
 app.use((req, res, next) => {

@@ -23,20 +23,20 @@ const getAllMentors = async (req, res) => {
       isActive: true
     };
 
-    // Add filters
+    // Add filters that can be applied at the DB level (MentorProfile fields only)
     if (specialization) {
       query.specializations = { $in: [new RegExp(specialization, 'i')] };
     }
 
-    if (country) {
-      query['userId.profile.country'] = new RegExp(country, 'i');
-    }
+    // Note: country and name search are applied AFTER populate (see below)
+    // because they live on the User document, not MentorProfile
 
     if (rating) {
       query.rating = { $gte: parseFloat(rating) };
     }
 
     if (search) {
+      // Search MentorProfile-level fields at DB level
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { bio: { $regex: search, $options: 'i' } },
@@ -47,11 +47,47 @@ const getAllMentors = async (req, res) => {
     // Optimize query for landing page (small limits)
     const isSmallLimit = limit <= 10;
 
-    // Fetch all mentors matching query without limit (for proper sorting)
-    const allMentors = await MentorProfile.find(query)
+    // Fetch all mentors matching DB-level query
+    let allMentors = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
       .select('title rating totalReviews userId slug badge')
       .lean(); // Convert to plain JS objects for better performance
+
+    // Post-populate filtering for User-level fields (name search & country)
+    // These fields live on the User document, so we filter after populate
+    if (search) {
+      const searchLower = search.toLowerCase();
+      // If the mentor already matched via DB-level $or (title/bio/specializations),
+      // keep them. Also include mentors whose name matches the search term.
+      // We re-fetch without the $or to get ALL active mentors, then filter by name.
+      // Instead, we do a second query without $or and merge results.
+      // Simpler approach: fetch all active mentors and filter everything in JS.
+      const allActiveMentors = await MentorProfile.find({ isActive: true, ...(specialization ? { specializations: { $in: [new RegExp(specialization, 'i')] } } : {}), ...(rating ? { rating: { $gte: parseFloat(rating) } } : {}) })
+        .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
+        .select('title rating totalReviews userId slug badge')
+        .lean();
+
+      // Filter: match if name, title, bio, or specializations contain the search term
+      allMentors = allActiveMentors.filter(mentor => {
+        const firstName = (mentor.userId?.profile?.firstName || '').toLowerCase();
+        const lastName = (mentor.userId?.profile?.lastName || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+        const title = (mentor.title || '').toLowerCase();
+
+        return fullName.includes(searchLower) ||
+          firstName.includes(searchLower) ||
+          lastName.includes(searchLower) ||
+          title.includes(searchLower);
+      });
+    }
+
+    if (country) {
+      const countryRegex = new RegExp(country, 'i');
+      allMentors = allMentors.filter(mentor => {
+        const mentorCountry = mentor.userId?.profile?.country || '';
+        return countryRegex.test(mentorCountry);
+      });
+    }
 
     // Define badge priority (higher number = higher priority)
     const badgePriority = {
@@ -338,36 +374,58 @@ const searchMentors = async (req, res) => {
       specializations: { $exists: true, $ne: [] },
       education: { $exists: true, $ne: [] },
       experience: { $exists: true, $ne: [] },
-      background: { $exists: true, $ne: null, $ne: '' },
-      $or: [
-        { title: { $regex: q, $options: 'i' } },
-        { bio: { $regex: q, $options: 'i' } },
-        { specializations: { $in: [new RegExp(q, 'i')] } }
-      ]
+      background: { $exists: true, $ne: null, $ne: '' }
     };
 
-    // Add additional filters
+    // Add additional filters (DB-level only)
     if (specialization) {
       query.specializations = { $in: [new RegExp(specialization, 'i')] };
-    }
-
-    if (country) {
-      query['userId.profile.country'] = new RegExp(country, 'i');
     }
 
     if (rating) {
       query.rating = { $gte: parseFloat(rating) };
     }
 
-    const mentors = await MentorProfile.find(query)
+    // Fetch all matching mentors (we'll filter by name/country after populate)
+    let allResults = await MentorProfile.find(query)
       .populate('userId', 'profile.firstName profile.lastName profile.avatar profile.country')
       .select('-verificationDocuments slug')
       .sort({ rating: -1, totalReviews: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
       .lean();
 
-    const total = await MentorProfile.countDocuments(query);
+    // Post-populate filtering: search by name, title, bio, specializations
+    if (q) {
+      const searchLower = q.toLowerCase();
+      allResults = allResults.filter(mentor => {
+        const firstName = (mentor.userId?.profile?.firstName || '').toLowerCase();
+        const lastName = (mentor.userId?.profile?.lastName || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+        const title = (mentor.title || '').toLowerCase();
+        const bio = (mentor.bio || '').toLowerCase();
+        const specs = (mentor.specializations || []).map(s => s.toLowerCase());
+
+        return fullName.includes(searchLower) ||
+          firstName.includes(searchLower) ||
+          lastName.includes(searchLower) ||
+          title.includes(searchLower) ||
+          bio.includes(searchLower) ||
+          specs.some(s => s.includes(searchLower));
+      });
+    }
+
+    // Post-populate filtering: country
+    if (country) {
+      const countryRegex = new RegExp(country, 'i');
+      allResults = allResults.filter(mentor => {
+        const mentorCountry = mentor.userId?.profile?.country || '';
+        return countryRegex.test(mentorCountry);
+      });
+    }
+
+    // Apply pagination after filtering
+    const total = allResults.length;
+    const startIndex = (page - 1) * limit;
+    const mentors = allResults.slice(startIndex, startIndex + (limit * 1));
 
     return sendSuccessResponse(res, 'Search results retrieved successfully', {
       mentors,

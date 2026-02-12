@@ -173,6 +173,7 @@ const getMe = async (req, res) => {
           email: user.email,
           role: user.role,
           profile: user.profile,
+          permissions: user.permissions, // Include permissions for admins
           isActive: user.isActive,
           isVerified: user.isVerified
         }

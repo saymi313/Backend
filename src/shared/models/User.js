@@ -64,6 +64,16 @@ const userSchema = new mongoose.Schema({
       message: 'Invalid role. Must be mentor, mentee, or admin (or null for Google OAuth users)'
     }
   },
+  permissions: {
+    type: [String],
+    default: [], // Empty array means no specific permissions (or could mean full access depending on implementation)
+    // For main admin, we might want to ensure they have all permissions or handle it in code
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   isActive: {
     type: Boolean,
     default: true

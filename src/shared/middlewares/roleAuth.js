@@ -9,7 +9,7 @@ const authorize = (...allowedRoles) => {
     }
 
     const userRole = req.user.role;
-    
+
     if (!allowedRoles.includes(userRole)) {
       return sendErrorResponse(res, ERROR_MESSAGES.FORBIDDEN, 403);
     }
@@ -21,6 +21,9 @@ const authorize = (...allowedRoles) => {
 const authorizeAdmin = authorize(USER_ROLES.ADMIN);
 const authorizeMentor = authorize(USER_ROLES.MENTOR, USER_ROLES.ADMIN);
 const authorizeMentee = authorize(USER_ROLES.MENTEE, USER_ROLES.ADMIN);
+
+console.log('DEBUG: roleAuth - USER_ROLES:', USER_ROLES);
+console.log('DEBUG: roleAuth - authorizeAdmin:', authorizeAdmin);
 
 module.exports = {
   authorize,

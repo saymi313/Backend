@@ -60,6 +60,7 @@ const login = async (req, res) => {
           id: user._id,
           email: user.email,
           role: user.role,
+          permissions: user.permissions, // Include permissions
           profile: user.profile
         },
         token
@@ -87,6 +88,7 @@ const getMe = async (req, res) => {
           email: user.email,
           role: user.role,
           profile: user.profile,
+          permissions: user.permissions, // Include permissions
           isActive: user.isActive,
           isVerified: user.isVerified
         }
