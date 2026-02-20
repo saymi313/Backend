@@ -53,6 +53,8 @@ cleanup-dummy-services.js
 create-mentor-profile.js
 data_audit.js
 debug_meetings.js
+delete_soban.js
+find_soban.js
 delete-all-services.js
 fix-payments.js
 move-approved-mentor.js
