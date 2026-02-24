@@ -576,12 +576,34 @@ const getMeetingsByDate = async (req, res) => {
 };
 
 // Get mentees for mentor (for dropdown selection)
+// Returns only the mentor's followers + mentees who bought their services, deduplicated
 const getMentorMentees = async (req, res) => {
   try {
-    // Fetch all active mentees from the system
     const User = require('../../shared/models/User');
+    const MentorProfile = require('../models/MentorProfile');
+    const Booking = require('../../shared/models/Booking');
+
+    // 1. Get follower IDs from MentorProfile
+    const mentorProfile = await MentorProfile.findOne({ userId: req.user.id }).select('followers');
+    const followerIds = mentorProfile?.followers || [];
+
+    // 2. Get buyer IDs from Bookings (distinct menteeId for this mentor)
+    const buyerIds = await Booking.find({ mentorId: req.user.id })
+      .distinct('menteeId');
+
+    // 3. Merge & deduplicate
+    const allIds = [...new Set([
+      ...followerIds.map(id => id.toString()),
+      ...buyerIds.map(id => id.toString())
+    ])];
+
+    if (allIds.length === 0) {
+      return sendSuccessResponse(res, 'Mentees retrieved successfully', { mentees: [] });
+    }
+
+    // 4. Fetch user profiles for the unique IDs
     const mentees = await User.find({
-      role: 'mentee',
+      _id: { $in: allIds },
       isActive: true
     })
       .select('profile email')
